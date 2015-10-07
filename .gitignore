@@ -1,0 +1,8 @@
+dist
+.stack-work
+cabal.config
+.cabal-sandbox
+bin/**
+tmp/**
+*.#*
+TAGS

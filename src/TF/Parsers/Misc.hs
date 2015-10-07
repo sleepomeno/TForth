@@ -1,0 +1,179 @@
+{-# LANGUAGE LambdaCase,OverloadedStrings, TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+
+
+module TF.Parsers.Misc where
+
+import           Control.Applicative hiding (optional, (<|>),many)
+
+import Control.Lens hiding (noneOf,(??))
+import Lens.Family.Total hiding ((&))
+import           Control.Error as E
+import  Text.PrettyPrint (render,vcat)
+import Control.Arrow (second, first)
+import Data.Data
+import Data.List
+import Data.Monoid
+import TF.Evaluator
+import           TF.WordsBuilder (buildWord')
+import           TF.StackEffectParser (parseFieldType, parseEffect, defParseStackEffectsConfig, parseCast', parseAssertion')
+import Control.Monad.Error
+import           Control.Monad.State hiding (state)
+import           Control.Monad.Reader (local)
+import           Control.Monad.Error.Lens
+import           Control.Monad.Free
+-- import           Control.Monad.Trans.Free
+import           Data.Char hiding (Control)
+import qualified Data.Map as M
+import qualified Data.Set as S
+import           TF.Types hiding (state, isSubtypeOf)
+import qualified TF.Types as T
+import qualified TF.Words as W hiding (coreWords')
+import           TF.Checker (checkNodes)
+import           TF.CheckerUtils (withEmpty)
+import  TF.Util
+import qualified Data.Text as Te
+import           Data.Maybe
+import           Text.Parsec hiding (runParser, anyToken)
+import qualified TF.Printer as P
+import TF.Errors
+import Debug.Trace
+
+import Control.Monad.Reader
+
+import TF.Parsers.ParserUtils
+
+parsePostpone :: ExpressionsM Expr
+parsePostpone = do
+  env <- ask
+  lift $ local (readFromStream .~ False) $ (`runReaderT` env) $ parseWordPostpone
+  isKnownWord <- view isKnownWord'
+  maybeResult <- lift $ isKnownWord
+  let err   = lift $ unexpected "You can only postpone a known word"
+  maybe err (either (return . PostponeImmediate) (return . Postpone)) maybeResult
+
+parseExecute :: ExpressionsM Expr
+parseExecute = do
+  assert' <- parseAssertion
+
+  parseWordExecute
+
+  -- iop $ "______ EXECUTE ______"
+
+  return $ Execute $ assert' ^?! _Assert._1
+
+parseInclude :: ExpressionsM Expr
+parseInclude = do
+  parseKeyword "include"
+  file <- parseUnknownName
+  return $ Include file
+
+parseRequire :: ExpressionsM Expr
+parseRequire = do
+  parseKeyword "require"
+  file <- parseUnknownName
+  return $ Require file
+
+parseTick :: ExpressionsM Expr
+parseTick = do
+  assert' <- parseRawAssertion
+
+  pw <- parseWordTick -- TODO take a tick-like word
+
+  guard $ has (_Assert._1._Compiled) assert'
+  guard $ has (stacksEffects._CompiledEff) pw -- TODO _Compiled Or _compiledandexecuted
+
+  iop $ "-------- TICK --------"
+  
+  return $ Tick (assert' ^. _Assert._1._Compiled) pw
+
+parseInterpreted :: ExpressionsM Expr
+parseInterpreted = do
+  parseWordLeftBracket
+  lift $ modifyState $ set currentCompiling False
+  parseNode <- view parseNode'
+  expr <- lift $ manyTill parseNode (parseUnknown "]")
+  lift $ modifyState $ set currentCompiling True
+  lift $ modifyState (stateVar .~ COMPILESTATE)
+  return $ Interpreted expr
+
+parseColon :: ExpressionsM Expr
+parseColon = do
+  -- iop "prse colon"
+  parseWordColon
+  w <- lift $ possWordAsString <$> anyToken 
+
+  parseStackEffectSemantics <- view parseStackEffectSemantics'
+  stackComment <- lift $ optionMaybe $ parseStackEffectSemantics parseEffect
+  
+  lift $ modifyState $ set currentCompiling True
+
+  let parseColonDefinitionBody :: ExpressionsM (ColonDefinition, [Node])
+      parseColonDefinitionBody = do 
+        expr <- manyWordsTill ";"
+        env <- ask
+        maybeImmediate <- lift $ optionMaybe $ flip runReaderT env $ parseWordImmediate
+        let isImmediate = isJust maybeImmediate
+            colonDefinition = ColonDefinition w expr isImmediate
+        return (colonDefinition, expr)
+      createColon (ColonDefinition _ _ isImmediate) = if isImmediate then  ColonExprImmediate else ColonExpr
+
+  let parseBody :: ExpressionsM Expr
+      parseBody = do
+        (colonDefinition, expr) <- parseColonDefinitionBody 
+        lift $ modifyState (over definedWords' $ M.insert w (review _ColonDefinition (colonDefinition, NotChecked)))
+        -- modifyState (over definedWords $ M.insert w colonDefinition)
+        -- modifyState (lastColonDefinition ?~ w)
+        lift $ modifyState $ set currentCompiling False
+        return $ (createColon colonDefinition) w stackComment expr
+
+  let typeCheckingFails :: String -> ExpressionsM Expr
+      typeCheckingFails reason =  do
+        -- iopP $ "failing with reason: " ++ reason
+
+        -- inp <- getInput
+        -- mapM_ iopS inp
+
+        allowLocalFailure' <- lift $ view allowLocalFailure
+        unless allowLocalFailure' $ throwing _Clash reason
+  
+        env <- ask
+        (colonDefinition, expr) <- lift $ local (typeCheck .~ False) $ flip runReaderT env $ parseColonDefinitionBody
+        lift $ modifyState (over definedWords' $ M.insert w (review _ColonDefinition (colonDefinition, Failed reason)))
+        lift $ modifyState $ set currentCompiling False
+        return $ ColonExprClash w stackComment
+
+  catches parseBody (errorHandler typeCheckingFails w)
+
+parseCast :: ExpressionsM Expr
+parseCast = do
+  parseStackEffectSemantics <- view parseStackEffectSemantics'
+  (sem, _) <- lift $ parseStackEffectSemantics parseCast'
+  iop "CAST"
+  iop $ show sem
+  let effs = sem ^. effectsOfStack._Wrapped
+  compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  return $ Cast (compOrExec effs)
+
+parseAssertion :: ExpressionsM Expr
+parseAssertion = do
+  iop "TRY ASSERTION"
+  -- inputs <- getInput
+  -- liftIO $ mapM print inputs
+
+  parseStackEffectSemantics <- view parseStackEffectSemantics'
+  (sem, forced) <- lift $ parseStackEffectSemantics parseAssertion'
+  iop "ASSERTION"
+  -- iop $ show sem
+  let effs = sem ^. effectsOfStack._Wrapped
+  compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  return $ Assert (compOrExec effs) forced
+  
+parseRawAssertion :: ExpressionsM Expr
+parseRawAssertion = do
+  -- iop $ "TRY RAW_ASSERTION"
+  parseStackEffectSemantics <- view parseStackEffectSemantics'
+  (sem, forced) <- lift $ parseStackEffectSemantics parseEffect
+  -- iop $ "RAW_ASSERTION"
+  let effs = sem ^. effectsOfStack._Wrapped
+  compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  return $ Assert (compOrExec effs) forced
