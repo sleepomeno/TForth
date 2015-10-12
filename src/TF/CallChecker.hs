@@ -1,6 +1,3 @@
-{-# LANGUAGE LambdaCase, MultiWayIf,TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, OverloadedStrings,  TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
-
-
 module TF.CallChecker where
 
 import Control.Arrow 
@@ -9,24 +6,14 @@ import           Control.Lens hiding (noneOf,(??))
 import Lens.Family.Total hiding ((&))
 import           Control.Monad
 import           Control.Monad.Writer
-import           Control.Monad.Reader
 import  Text.PrettyPrint (render,vcat, text, ($+$), nest)
-
-import           Control.Monad.State
-import Data.Functor
-import Data.List
 
 import           Control.Monad.RWS
 import           TF.Parsers.Parser
 import           TF.Parsers.Tokenizer
-import Data.Maybe
 import           TF.Util
-import qualified TF.Types as T
 import           TF.Types hiding (word)
 import           Text.Parsec hiding (token)
-import TF.Checker
-import Data.Data
-import Data.Typeable
 import TF.Errors
 import qualified TF.Printer as P
 import qualified Data.Map as M
@@ -36,9 +23,6 @@ import System.IO
 import System.FilePath
 
 import TF.Paths
-import Debug.Trace
-
--- import Control.DeepSeq
 
 checkFile :: ParseConfig -> FilePath -> IO ()
 checkFile conf file = do
@@ -77,6 +61,7 @@ runChecker' conf s = do
        runParserT parseProgram (defParseState & subtypeRelation .~ subtypeRelation' primitiveTypes (conf ^. subtypes)) "" words'
      -- showInfo :: Info -> IO ()
 
+defParseState :: ParseState
 defParseState = ParseState M.empty M.empty INTERPRETSTATE False emptyForthEffect (M.fromList [("object", [])]) (M.fromList [("object", [])]) S.empty M.empty []
 
          
@@ -90,7 +75,7 @@ runChecker config s = do
            )
    where
      showResult :: ([ForthWordOrExpr], ParseState) -> IO ()
-     showResult (exprs, parseState) = do
+     showResult (_, parseState) = do
        let checkerState = showCheckerState parseState
            effs = showEffects' . view (effects._Wrapped._1) $ parseState
        putStrLn checkerState

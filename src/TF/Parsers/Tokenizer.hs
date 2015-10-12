@@ -1,8 +1,7 @@
-{-# LANGUAGE LambdaCase,OverloadedStrings, TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+{-# LANGUAGE  FlexibleContexts #-}
 
 module TF.Parsers.Tokenizer (parseWords) where
 
-import           Control.Applicative hiding (optional, (<|>),many)
 
 import Control.Lens hiding (noneOf,(??))
 import           Control.Error as E
@@ -13,12 +12,8 @@ import           Control.Monad.Free
 -- import           Control.Monad.Trans.Free
 import           Data.Char hiding (Control)
 import qualified Data.Map as M
-import qualified Data.Set as S
 import           TF.Types hiding (state, isSubtypeOf)
-import qualified TF.Types as T
-import qualified TF.Words as W hiding (coreWords')
-import           TF.Checker (checkNodes)
-import           TF.CheckerUtils (withEmpty)
+import qualified TF.Words as W
 import  TF.Util
 import qualified Data.Text as Te
 import           Text.Parsec hiding (runParser, anyToken)
@@ -53,7 +48,7 @@ parseNextWord = do
                          possibleWord
     -- number <- (view word) <$> (lift $ local (allCoreDynamic .~ False) $ buildWord' W.number)
     number <- (view word) <$> (lift $ buildWord' W.number)
-    try parseToken <|> (int *> (return . (new _Number) $ number))
+    try parseToken <|> (int *> (return . new _Number $ number))
 
 neitherDigitNorSpace x = not $ isDigit x || isSpace x
 

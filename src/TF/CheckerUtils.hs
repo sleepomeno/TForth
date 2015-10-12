@@ -1,41 +1,20 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, FlexibleContexts,
-             FlexibleInstances, FunctionalDependencies, LambdaCase, MultiWayIf,
-             NoMonomorphismRestriction, OverloadedStrings,
-             RankNTypes, RecordWildCards, TemplateHaskell, TupleSections,
-             TypeFamilies #-}
+{-# LANGUAGE NoMonomorphismRestriction  #-}
 
 module TF.CheckerUtils where
 
-import           Control.Arrow
-import Control.Applicative
 import           Control.Error            as E
-import Control.Monad.Error.Class (MonadError)
 import           Control.Lens             hiding (noneOf, (??), _Empty)
 import           Control.Monad.Error.Lens
 import           Control.Monad.Extra
 import           Control.Monad.Reader
 import           Control.Monad.Writer
-import           Control.Monad.Cont
-import           Data.String
-import           Lens.Family.Total        hiding ((&))
-import           Text.PrettyPrint         (Doc, hcat, nest, render, style, text,
-                                           vcat, ($+$), (<+>))
-import           TF.StackCalculus
-import           TF.StackEffectParser
-import           TF.WildcardRules
+import           Text.PrettyPrint  (render)
 import           TF.ForthTypes as FT
 
-import           Control.Monad.State
-import           Data.Functor
 import           Data.List
-import           Data.Maybe
-import           Data.Monoid
-import qualified TF.Types                 as T
 import           TF.Util
 -- import qualified TF.DataTypes as DT
-import           Data.Data
 import qualified Data.Map                 as M
-import           Data.Typeable
 import           Text.Parsec              hiding (token)
 import qualified TF.Printer               as P
 import           TF.Types                 hiding (isSubtypeOf, word)
@@ -112,7 +91,7 @@ exportColonDefinition isForced colonName effs' compI = do
                    else
                      return $ modifier effs
 
-    modifyState $ definedWords'.(ix colonName)._ColonDefinition._2 .~ checkResult
+    modifyState $ definedWords'.ix colonName._ColonDefinition._2 .~ checkResult
             
 
 changeEffectsOfState :: (StackEffect -> StackEffect) -> CheckerM ()
@@ -127,7 +106,7 @@ changeEffectsOfState f = do
                return (map f $ effs' ^. _1, effs' ^. _2)
              else
                return (effs' ^. _1, map f $ effs' ^. _2)
-  modifyState $ effects._Wrapped .~ ((uncurry zip newEffs), i)
+  modifyState $ effects._Wrapped .~ (uncurry zip newEffs, i)
   
 
 effectsOfState :: CheckerM [StackEffect]
@@ -135,7 +114,7 @@ effectsOfState = do
   s <- getState
   -- let comp = views stateVar (== COMPILESTATE) s
   let comp = view currentCompiling s
-      (effs'', i) = view (effects._Wrapped) s
+      (effs'', _) = view (effects._Wrapped) s
       effs = unzip effs''
   if comp then
     return $ effs ^. _1
@@ -148,7 +127,7 @@ replaceWrappers result = do
   let wwrappersOfEff :: StackEffect -> [Int]
       wwrappersOfEff eff = toListOf (before.wrapperLens._2._Just) eff ++ toListOf (after.wrapperLens._2._Just) eff
 
-      wrapperLens = traverse.filtered (\(t,i) -> baseType' t == WildcardWrapper)
+      wrapperLens = traverse.filtered (\(t,_) -> baseType' t == WildcardWrapper)
   let wrapperIndices = concatMap wwrappersOfEff result
 
   replacements <- forM (nub wrapperIndices) $ \i -> do
@@ -157,7 +136,7 @@ replaceWrappers result = do
 
   let changeWrappersToUnknown :: StackEffect -> StackEffect
       changeWrappersToUnknown eff = eff & before.wrapperLens %~ replaceWrapper & after.wrapperLens %~ replaceWrapper
-      replaceWrapper (t, Nothing) = error "index of wildcardwrapper is always a just!"
+      replaceWrapper (_, Nothing) = error "index of wildcardwrapper is always a just!"
       replaceWrapper (t, Just i) =
         let id = lookup i replacements
             id' = case id of
@@ -174,7 +153,7 @@ allFieldImplementations field = do
   keysValues <- views classFields M.toList <$> getState
   let filterMethods (className, fields) = do
         let fields' = filter (\(m, _) -> m == field) fields
-        let effs = concatMap (\(m, oofieldsem) -> case oofieldsem of
+        let effs = concatMap (\(_, oofieldsem) -> case oofieldsem of
                                                       ByFieldDefinition effs -> [effs]
                                                       InferredByField   effs -> [effs]) fields' :: [StackEffect]
         return (className, effs)
@@ -195,10 +174,7 @@ allMethodImplementationss method = do
                                                       InferredByMethod (effs, _) -> effs) methods' :: [StackEffect]
         return (className, effs)
 
-  filtered <- mapM filterMethods  keysValues -- :: CheckerM [(ClassName, [StackEffect]) ]
-
-  return filtered
-
+  mapM filterMethods  keysValues -- :: CheckerM [(ClassName, [StackEffect]) ]
 
 
 noDoubleDefinition method definedEffByClass' stackCommentEffects =
@@ -229,7 +205,7 @@ effectMatches' (eff1, int1) (eff2, int2) = handling _TypeClash (const $ return F
     checkEffects $ withIntersect int1 [(before', StackEffect [] [] [])]
     checkEffects $ withIntersect int2 [(eff2, StackEffect [] [] [])]
     checkEffects $ withIntersect int1 [(after', StackEffect [] [] [])]
-  s <-  lift $ getState
+  s <-  lift getState
   let eff = map fst (s ^. effects._Wrapped._1)
   -- iop "Das sind die effekte:"
   -- iop $ show eff
@@ -255,7 +231,7 @@ effectMatches eff1 eff2 = handling _TypeClash (const $ return False) $ withEmpty
       after' = StackEffect (eff1 ^. after) [] []
   checkEffects' <- view _2 :: CheckerM' CheckEffectsT
   lift $ (`runReaderT` defCheckEffectsConfig) $ do
-    checkEffects' $ withoutIntersect $ [(before', StackEffect [] [] [])]
+    checkEffects' $ withoutIntersect [(before', StackEffect [] [] [])]
     checkEffects' $ withoutIntersect [(eff2, StackEffect [] [] [])]
     checkEffects' $ withoutIntersect [(after', StackEffect [] [] [])]
   s <- lift getState

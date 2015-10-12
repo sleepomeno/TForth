@@ -1,13 +1,8 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, FlexibleContexts,
-             FlexibleInstances, FunctionalDependencies, LambdaCase, MultiWayIf,
-             NoMonomorphismRestriction, OverloadedStrings,
-             RankNTypes, RecordWildCards, TemplateHaskell, TupleSections,
-             TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts, LambdaCase, MultiWayIf  #-}
 
 module TF.Checker where
 
 import           Control.Arrow
-import Control.Applicative
 import           Control.Error            as E
 import           Control.Lens             hiding (noneOf, (??), _Empty)
 import           Control.Monad.Error.Lens
@@ -15,8 +10,7 @@ import           Control.Monad.Extra
 import           Control.Monad.Reader
 import           Control.Monad.Writer
 -- import           Lens.Family.Total        hiding ((&))
-import           Text.PrettyPrint         (Doc, hcat, nest, render, style, text,
-                                           vcat, ($+$), (<+>))
+import           Text.PrettyPrint         (render, vcat)
 import           TF.StackCalculus
 import           TF.WildcardRules
 
@@ -29,15 +23,13 @@ import TF.Errors
 
 import TF.CheckerUtils
 import TF.HasEffects.HasStackEffects
-import TF.HasEffects.Expressions
-import TF.HasEffects.ForthWord
+import TF.HasEffects.Expressions()
 
 checkNodes :: [Node] -> CheckerM ForthEffect
 checkNodes nodes = do
   mapM_ collectEffects nodes
 
-  effs <- view effects <$> getState
-  return effs
+  view effects <$> getState
 
 zipzap effects = for effects $ \((oldComp,oldExec),(newComp,newExec)) -> ((oldComp, newComp), (oldExec, newExec))
 
@@ -49,7 +41,7 @@ removeWildcards effs = do
                                                                           >=> uncurry newTopTypeNotWildcard
                                                                           >=> uncurry sameDegree)                                                  >>> runWriterT) (zipzap effs) ) :: CheckerM [((StackEffects, StackEffects), [ChangeState])])
   let stateChanges' = filter (not . null) stateChanges
-  when (length stateChanges' /= 0 && length (group stateChanges') /= 1) $ do
+  when (not (null stateChanges') && length (group stateChanges') /= 1) $ do
          lift $ blocked $ mapM_ (iopC . show) stateChanges'
          throwing _DifferentChangeStates ()
 
@@ -64,12 +56,11 @@ removeWildcards effs = do
 
 
 
-  return $ zipzap $ result
-  -- return undefined
+  return $ zipzap result
 
 resolveUnknownType :: Identifier -> DataType -> CheckerM ()
 resolveUnknownType identifier arg = blocked $ do
-  iopW $ "RESOLVE UNKNOWN TYPES OF"
+  iopW "RESOLVE UNKNOWN TYPES OF"
   targets1 <- toListOf (definedWords'.traverse._CreateDefinition.traverse.after.traverse.filtered isUnknownType) <$> getState 
   targets2 <- toListOf (definedWords'.traverse._ColonDefinition._2._Checked._1.traverse.streamArgs.traverse._Defining.argType._Just) <$> getState 
   targets3 <- toListOf (definedWords'.traverse._ColonDefinition._2._Checked._1.traverse.after.traverse.filtered isUnknownType) <$> getState 
@@ -120,7 +111,7 @@ collectEffects a = do
   -- iopC "Next:"
   -- iopC $ render $ P.forthWordOrExpr a
   stE2s <- (`runReaderT` (checkNodes, checkEffects, collectEffects)) $ either getStackEffects getStackEffects a
-  let config = defCheckEffectsConfig & forthWordOrExpr .~ Just a & isForcedAssertion .~ (has (_Expr._Assert._2.only True) a)
+  let config = defCheckEffectsConfig & forthWordOrExpr .~ Just a & isForcedAssertion .~ has (_Expr._Assert._2.only True) a
   flip runReaderT config $ checkEffects stE2s
   -- iopC $ show stE2s
 
@@ -173,7 +164,7 @@ checkEffects (ForthEffect (stE2s, IntersectionType newCompileI newExecI)) = do
       compileEffectClash = COMPILESTATE `elem` effectsWithClash
       execEffectClash = INTERPRETSTATE `elem` effectsWithClash
 
-  forbidMultiEffs <- lift $ views allowMultipleEffects not
+  -- forbidMultiEffs <- lift $ views allowMultipleEffects not
 
   let (nrOfOldCompEffs, nrOfOldExecEffs) = unzip realEffs & both %~ length . nub
       (nrOfNewCompEffs, nrOfNewExecEffs) = unzip stE2s    & both %~ length . nub
@@ -197,7 +188,7 @@ checkEffects (ForthEffect (stE2s, IntersectionType newCompileI newExecI)) = do
 
 
 
-  when ((compileEffectError || execEffectError)) $ do
+  when (compileEffectError || execEffectError) $ do
     iop $ "compileEffectError: " <> show compileEffectError
     iop $ "execEffectERror: " <> show execEffectError
     iop $ "oldCompileI: " <> show oldCompileI
@@ -264,7 +255,6 @@ handleArgs (Left arg) = do
     uniqueId <- identifier <<+= 1
     uniqueId2 <- identifier <<+= 1
     uniqueId3 <- identifier <<+= 1
-    uniqueId4 <- identifier <<+= 1
     -- let maybeRuntimeType = _Just.chosen.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe (Either [(StackEffect,StackEffect)] [(StackEffect,StackEffect)])
     -- let maybeRuntimeType = _Just.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
     let maybeRuntimeType = view runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
@@ -321,9 +311,9 @@ handleArgs (Left arg) = do
                                 return [defaultRuntimeType]
 
     when (has (resolved._Just) arg) $
-      modifyState $ definedWords'.(at (arg ^?! resolved._Just)) ?~ (new _CreateDefinition runtimeType)
+      modifyState $ definedWords'.(at (arg ^?! resolved._Just)) ?~ new _CreateDefinition runtimeType
     -- let arg' =  arg & argType .~ (either (const Nothing) Just typeOfArg) & runtimeChecked .~ checked
-    let arg' =  arg & argType .~ (either (const Nothing) Just typeOfArg) 
+    let arg' =  arg & argType .~ either (const Nothing) Just typeOfArg
     return $ Left $ arg'
 
 

@@ -1,34 +1,20 @@
-{-# LANGUAGE MultiWayIf, OverloadedStrings #-}
-{-# LANGUAGE LambdaCase, TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+{-# LANGUAGE MultiWayIf, LambdaCase, TupleSections, FlexibleContexts   #-}
 
 module TF.Evaluator where
 
 import Prelude hiding (Word)
-import           Control.Applicative hiding (optional, (<|>),many)
 
 import Control.Lens hiding (noneOf,(??))
 import Data.Text.Lens 
 import Lens.Family.Total hiding ((&))
 import           Control.Monad.Cont
 import           Control.Error as E
-import  Text.PrettyPrint (render,vcat)
-import Data.Data
-import Data.List
--- import           TF.WordsBuilder (stackToLens)
-import           TF.StackEffectParser (parseEffect)
-import Control.Monad.Error
-import           Control.Monad.State hiding (state)
+import  Text.PrettyPrint (render)
 import           Control.Monad.Reader (local)
 import           Control.Monad.Error.Lens
-import           Data.Char hiding (Control)
 import           Data.Monoid ((<>))
 import           TF.SubtypeUtil
-import qualified Data.Map as M
 import           TF.Types hiding (state)
-import qualified TF.Types as T
-import qualified TF.Words as W
-import           TF.Checker (checkNodes)
-import           TF.CheckerUtils (effectsOfState, withEmpty)
 import  TF.Util
 import           Data.Maybe
 import           Text.Parsec hiding (runParser, anyToken)
@@ -69,7 +55,7 @@ evalKnownWord w' = do
               case intSem of
                 ADOPT_EXECUTION        -> return definedExeSem
                 IntSemDefined (Sem x)  -> return . Just $ x
-                _                      -> unexpected $ "Interpretation semantics not defined for " ++ (view name w')
+                _                      -> unexpected $ "Interpretation semantics not defined for " ++ view name w'
             else
               case compSem of
                 IMMEDIATE_EXECUTION    -> return  definedExeSem
@@ -92,18 +78,18 @@ evalKnownWord w' = do
                            if state' == COMPILESTATE && compSem == APPEND_EXECUTION then
                              (_CompiledEff #) 
                            else 
-                             maybe (_ExecutedEff #) (\runtime -> \execSem -> (_CompAndExecutedEff #) (view effectsOfStack . reverseStacks' $ runtime, execSem)) runtimeSem
+                             maybe (_ExecutedEff #) (\runtime execSem -> (_CompAndExecutedEff #) (view effectsOfStack . reverseStacks' $ runtime, execSem)) runtimeSem
 
   let newIntersect = if | state' == COMPILESTATE && compSem == APPEND_EXECUTION -> intersect & compileEffect .~ (intersect ^. execEffect)
                         | isNothing runtimeSem -> intersect
                         | True -> intersect
 
   let kw = ParsedWord {}
-           & name .~ (view name w')
-           & parsed .~ (view parsed w')
+           & name .~ view name w'
+           & parsed .~ view parsed w'
            & stacksEffects .~ singleSemantics
            & intersectionType .~ newIntersect
-           & enter .~ (view enter (fromJust sem))
+           & enter .~ view enter (fromJust sem)
 
   let args :: MaybeT (ParsecT [Token] ParseState StackEffectM) [DefiningOrNot]
       args = hoistMaybe $ preview (stacksEffects._ExecutedEff._Wrapped._head.streamArgs) kw `mplus`
@@ -123,14 +109,14 @@ evalKnownWord w' = do
 
   
   s <- getState
-  return $ (KnownWord (maybe kw id kw'), view stateVar s)
+  return (KnownWord (maybe kw id kw'), view stateVar s)
   -- return  kw
           
 
   
 
 maybeColonDefinition :: Unknown -> ParseState -> Maybe ColonDefinition'
-maybeColonDefinition w' s   = (preview (definedWords'.at (w' ^. name)._Just._ColonDefinition) s)-- & fmap (view _ColonDefinition)
+maybeColonDefinition w' s   = preview (definedWords'.at (w' ^. name)._Just._ColonDefinition) s-- & fmap (view _ColonDefinition)
 -- maybeDefinition w' s   = view (definedWords'.at (w' ^. name)) s
 evalNonDefinition  =  UnknownE . Unknown . view name
 
@@ -156,9 +142,9 @@ evalColonDefinition (colonDef, effs')  = do
 
   let args = stEff ^. streamArgs
       compiledOrExecuted = if executed  then
-                             (new _Executed)
+                             new _Executed
                            else
-                             (new _Compiled)
+                             new _Compiled
 
   iopP $ "EXECUTED:"
   iopP $ show executed
@@ -186,16 +172,16 @@ evalCreatedWord uk = do
   parseState <- lift getState
   -- let maybeEffects = view (colonDefEffects.at ukName) parseState
   let maybeEffects :: Maybe [StackEffect]
-      maybeEffects = preview (definedWords'.(at ukName)._Just._CreateDefinition) parseState 
+      maybeEffects = preview (definedWords'.at ukName._Just._CreateDefinition) parseState 
   effs <- hoistMaybe maybeEffects
   -- iop $ "ukname is '" ++ ukName ++ "'!"
   let st = view stateVar parseState
       executed = st == INTERPRETSTATE 
 
   let compiledOrExecuted = if executed  then
-                             (new _Executed)
+                             new _Executed
                            else
-                             (new _Compiled)
+                             new _Compiled
 
   return (DefE . compiledOrExecuted . (, effs) $ ukName, st)
 
@@ -203,7 +189,7 @@ evalCreatedWord uk = do
 evalDefinedWord :: Unknown -> MaybeT CheckerM (ForthWord, SemState)
 evalDefinedWord uk = do
                       
-     s <- lift $ getState
+     s <- lift getState
      let state' = view stateVar s
      cDef@(definition,effects) <- hoistMaybe $ maybeColonDefinition uk s
 

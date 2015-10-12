@@ -1,20 +1,16 @@
-{-# LANGUAGE FlexibleInstances, TemplateHaskell, DeriveGeneric #-}
 module TF.Printer where
 
 import Prelude hiding (Word)
-import  Text.PrettyPrint ((<+>),($+$),text,render,style,Doc,vcat,nest,hcat, hsep)
-import  Text.Show.Pretty (ppDoc, ppShow)
+import  Text.PrettyPrint ((<+>),($+$),text,Doc,vcat,nest,hsep)
+import  Text.Show.Pretty (ppDoc)
 import Lens.Family.Total hiding ((&))
 import           TF.Types hiding (word, forthWordOrExpr)
 import           Control.Lens hiding (noneOf)
-import Control.Monad
 import Control.Arrow ((***),(>>>))
 import Data.Monoid
 import Data.Maybe
 
 import TF.ForthTypes
-
-
 
 nested = nest 1
 

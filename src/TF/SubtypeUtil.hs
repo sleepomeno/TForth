@@ -1,39 +1,18 @@
 module TF.SubtypeUtil where
 
 import           Control.Arrow
-import Control.Applicative
 import           Control.Error            as E
-import Control.Monad.Error.Class (MonadError)
 import           Control.Lens             hiding (noneOf, (??), _Empty)
-import           Control.Monad.Error.Lens
 import           Control.Monad.Extra
 import           Control.Monad.Reader
 import           Control.Monad.Writer
 import           Control.Monad.Cont
-import           Data.String
-import           Lens.Family.Total        hiding ((&))
-import           Text.PrettyPrint         (Doc, hcat, nest, render, style, text,
-                                           vcat, ($+$), (<+>))
-import           TF.StackEffectParser
-import           TF.WildcardRules
 import           TF.ForthTypes as FT
 
-import           Control.Monad.State
-import           Data.Functor
-import           Data.List
 import qualified Data.Set as S
-import           Data.Maybe
-import           Data.Monoid
-import qualified TF.Types                 as T
 import           TF.Util
--- import qualified TF.DataTypes as DT
-import           Data.Data hiding (DataType)
-import qualified Data.Map                 as M
-import           Data.Typeable
 import           Text.Parsec              hiding (token)
-import qualified TF.Printer               as P
 import           TF.Types                 hiding (isSubtypeOf, word)
-import TF.Errors
 
 isSubtypeOf :: DataType -> DataType -> CheckerM Bool
 isSubtypeOf t1 t2 = do
@@ -71,7 +50,7 @@ getCommonSupertype effs1 effs2 = do
   guard1 <- allM (\(x1, x2) -> anyM (\(y1, y2) -> do
     res1 <- y1 `effectIsSubtypeOf` x1
     res2 <- y2 `effectIsSubtypeOf` x2
-    return $ res1) effs1) effs2
+    return res1) effs1) effs2
   guard2 <- allM (\(x1, x2) -> anyM (\(y1, y2) -> do
     res1 <- y1 `effectIsSubtypeOf` x1
     res2 <- y2 `effectIsSubtypeOf` x2

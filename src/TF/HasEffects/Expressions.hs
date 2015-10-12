@@ -1,53 +1,30 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, FlexibleContexts,
-             FlexibleInstances, FunctionalDependencies, LambdaCase, MultiWayIf,
-             NoMonomorphismRestriction, OverloadedStrings,
-             RankNTypes, RecordWildCards, TemplateHaskell, TupleSections,
-             TypeFamilies #-}
+{-# LANGUAGE  LambdaCase  #-}
 
 module TF.HasEffects.Expressions (getStackEffects) where
 
-import           Control.Arrow
-import Control.Applicative
 import           Control.Error            as E
-import Control.Monad.Error.Class (MonadError)
 import           Control.Lens             hiding (noneOf, (??), _Empty)
 import           Control.Monad.Error.Lens
 import           Control.Monad.Extra
 import           Control.Monad.Reader
-import           Control.Monad.Writer
 import           Control.Monad.Cont
-import           Data.String
--- import           Lens.Family.Total        hiding ((&))
-import           Text.PrettyPrint         (Doc, hcat, nest, render, style, text,
-                                           vcat, ($+$), (<+>))
-import           TF.StackCalculus
+import           Text.PrettyPrint         (render)
 import Data.Function (on)
-import           TF.StackEffectParser
-import           TF.WildcardRules
-import           TF.ForthTypes as FT
 
-import           Control.Monad.State
-import           Data.Functor
 import           Data.List
-import           Data.Maybe
-import           Data.Monoid
-import qualified TF.Types                 as T
 import           TF.Util
 -- import qualified TF.DataTypes as DT
 -- import           Data.Data
-import qualified Data.Map                 as M
-import           Data.Typeable
 import           Text.Parsec              hiding (token)
 import qualified TF.Printer               as P
 import           TF.Types                 hiding (isSubtypeOf, word)
 import TF.Errors
-import Debug.Trace
 
 import TF.CheckerUtils
 import TF.HasEffects.HasStackEffects
-import TF.HasEffects.ForthWord
 import qualified TF.HasEffects.ControlStructures as CS
 import qualified TF.HasEffects.OOP as OOP
+import TF.HasEffects.ForthWord()
 
 instance HasStackEffects Expr where
 
@@ -98,7 +75,7 @@ instance HasStackEffects Expr where
 
           return result'
   
-    withEmpty' $ (do
+    withEmpty' $ do
       lift $ depth += 1
       cr <- checkNodes [create]
 
@@ -119,17 +96,17 @@ instance HasStackEffects Expr where
         -- liftIO $ mapM_ (putStrLn . render . P.stackEffect) effs
         maybe (liftUp . lift  $ preview (_head.before._head) effs E.?? (_Impossible # "No top stack value in maybeInitType")) return typeOfCreated) :: CheckerM (Maybe IndexedStackType)
 
-      result <- (case maybeInitType of
+      result <- case maybeInitType of
                     Nothing -> go (create, [], Nothing, does)
                     Just initType -> do
-                      let newCreating = create & (elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0).argType ?~ initType
-                      go (newCreating, init ^?! _Just._1, init ^? _Just._2, does))
+                      let newCreating = create & elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0.argType ?~ initType
+                      go (newCreating, init ^?! _Just._1, init ^? _Just._2, does)
 
       effs <- effectsOfState
       iopC "Show effects of create:\n"
       showEffs' effs
       lift $ depth -= 1
-      return result)
+      return result
 
     where
        l = if has (_Left._DefE) create then
@@ -282,7 +259,7 @@ instance HasStackEffects Expr where
                     (mapM_ (iopC . render . P.stackEffect) $ compColonEffects )
 
                     iop $ "> spezifizierte EFFEKTE:"
-                    (mapM_ (iopC . render . P.stackEffect) $ specifiedEffs )
+                    mapM_ (iopC . render . P.stackEffect) specifiedEffs 
                     -- lift . lift . lift $ E.left $ "Stack comment does not match in word " ++ colonName
                     lift . lift $ throwing _NotMatchingStackComment colonName
               return (effs, compI))

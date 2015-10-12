@@ -1,57 +1,33 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, FlexibleContexts,
-             FlexibleInstances, FunctionalDependencies, LambdaCase, MultiWayIf,
-             NoMonomorphismRestriction, OverloadedStrings,
-             RankNTypes, RecordWildCards, TemplateHaskell, TupleSections,
-             TypeFamilies #-}
+{-# LANGUAGE   FlexibleContexts,  MultiWayIf  #-}
 
 module TF.HasEffects.OOP where
 
-import           Control.Arrow
-import Control.Applicative
 import           Control.Error            as E
-import Control.Monad.Error.Class (MonadError)
 import           Control.Lens             hiding (noneOf, (??), _Empty)
 import           Control.Monad.Error.Lens
 import           Control.Monad.Extra
 import           Control.Monad.Reader
 import           Control.Monad.Writer
-import           Control.Monad.Cont
-import           Data.String
--- import           Lens.Family.Total        hiding ((&))
-import           Text.PrettyPrint         (Doc, hcat, nest, render, style, text,
-                                           vcat, ($+$), (<+>))
-import           TF.StackCalculus
-import Data.Function (on)
-import           TF.StackEffectParser
-import           TF.WildcardRules
-import           TF.ForthTypes as FT
+import           Text.PrettyPrint         (render)
 
-import           Control.Monad.State
-import           Data.Functor
-import           Data.List
 import           Data.Maybe
-import           Data.Monoid
-import qualified TF.Types                 as T
 import           TF.Util
 import           TF.SubtypeUtil
 -- import qualified TF.DataTypes as DT
 -- import           Data.Data
 import qualified Data.Map                 as M
-import           Data.Typeable
 import           Text.Parsec              hiding (token)
 import qualified TF.Printer               as P
 import           TF.Types                 hiding (isSubtypeOf, word)
 import TF.Errors
-import Debug.Trace
 
 import TF.CheckerUtils
-import TF.HasEffects.ForthWord
 
 getStackEffects' (NewObject cOrE) = do
     let compOrExec = case cOrE of { Left _ -> new _Compiled ; Right _ -> new _Executed }
         name = case cOrE of { Left x -> x; Right x -> x }
         eff = [StackEffect [] [] [(NoReference $ _ClassType # name, Just 1)]]
-    return $ withoutIntersect (effsAsTuples $ (compOrExec $ eff))
+    return $ withoutIntersect (effsAsTuples $ compOrExec eff)
 
 getStackEffects' (SuperClassMethodCall className method) = do
     let getEffs :: [(Method, OOMethodSem)] -> [StackEffect]
@@ -178,9 +154,9 @@ getStackEffects' (NoName stackCommentEffects exprs clazz method) = do
                         -- stackCommentIsOK <- allM (\x -> anyM (\y -> lift $ y `effectIsSubtypeOf` x) compColonEffects) stEffs
                         stackCommentIsOK <- allM (\x -> anyM (\y -> do
                                                  iopC $ "Is " ++ render (P.stackEffect y) ++ " a subtype of " ++ render (P.stackEffect x) ++ "?"
-                                                 res <- lift $ y `effectIsSubtypeOf` x
+                                                 lift $ y `effectIsSubtypeOf` x
                                                  -- lift $ iop $ "Result is " ++ show res
-                                                 return res) compColonEffects) stEffs
+                                                 ) compColonEffects) stEffs
 
 
                         if stackCommentIsOK then do

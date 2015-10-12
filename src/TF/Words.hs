@@ -1,29 +1,24 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings  #-}
 
 module TF.Words where
 
 import Prelude hiding (until, drop, Word)
 import qualified Data.Map as M
 import Control.Lens
-import Control.Error
 -- import           Lens.Family2
 import Control.Monad
 import Control.Monad.Free
 import           TF.Types hiding (depth)
-import           TF.Util
-import qualified Data.Text as Te
-import           Control.Applicative
 import TF.WordsBuilder
 
 -----------
 -- WORDS --
 -----------
 -- number = view word <$> (buildWord $ do
-number = (buildWord $ do
+number = buildWord $ do
    numberParsed
    named "a number"
-   effect "( -- n )")
+   effect "( -- n )"
 
 create = buildWord $ do
   parsing "create"

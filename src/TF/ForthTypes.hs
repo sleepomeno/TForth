@@ -1,24 +1,9 @@
-{-# LANGUAGE OverloadedStrings, StandaloneDeriving, TypeFamilies, DeriveFunctor, GADTs, TemplateHaskell, FunctionalDependencies, FlexibleInstances, GADTs, NoMonomorphismRestriction, DeriveGeneric,DeriveDataTypeable, DataKinds #-}
+{-# LANGUAGE  TemplateHaskell, FunctionalDependencies, FlexibleInstances, DeriveDataTypeable #-}
 
 module TF.ForthTypes where
 
 import  Control.Lens
 import           Data.Data hiding (DataType)
-import           Control.Monad.Trans.Free
-import           Control.Monad.State
-import           Control.Monad.Writer
-import           Control.Monad.Reader
-import Text.PrettyPrint (Doc)
-import GHC.Generics (Generic)
-import Lens.Family.Total hiding ((&))
-import           Control.Monad.RWS
--- import  Text.PrettyPrint (render)
-import Data.Tree
-import           Control.Error as E
-import           Text.Parsec hiding (runParser, char)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import qualified Data.Text as Te
 
 
 data Size = One | Two | ImpDependent | ZeroOrMore deriving (Show,Read,Eq,Data,Typeable, Ord)

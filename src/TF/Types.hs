@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase,OverloadedStrings, StandaloneDeriving, TypeFamilies, DeriveFunctor, GADTs, TemplateHaskell, FunctionalDependencies, FlexibleInstances, GADTs, NoMonomorphismRestriction, DeriveGeneric,DeriveDataTypeable, DataKinds #-}
+{-# LANGUAGE OverloadedStrings,  TypeFamilies, DeriveFunctor, GADTs, TemplateHaskell, FunctionalDependencies, FlexibleInstances,  NoMonomorphismRestriction, DeriveGeneric,DeriveDataTypeable, DataKinds #-}
 module TF.Types where
 
 import Prelude hiding (Word)
@@ -72,7 +72,7 @@ baseType (arg, i) = (baseType' arg, i)
 setBaseType :: DataType -> DataType -> DataType
 setBaseType new (NoReference _) = new
 setBaseType new (Reference old) = Reference $ setBaseType new old
-setBaseType new old = new 
+setBaseType new _ = new 
 
 baseType' :: DataType -> DataType
 baseType' Dynamic = Dynamic

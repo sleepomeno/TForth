@@ -1,31 +1,21 @@
-{-# LANGUAGE ImpredicativeTypes, OverloadedStrings, LambdaCase, MultiWayIf,TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+{-# LANGUAGE  FlexibleContexts, NoMonomorphismRestriction #-}
 
 module TF.WildcardRules (sameDegree,renameWildcards, oldWildcardDegreeIsGreater, newWildcardDegreeIsGreater, oldTopTypeNotWildcard, newTopTypeNotWildcard) where 
 
-import Data.String
 import Control.Arrow 
-import           Control.Error as E
 import           Control.Lens hiding (noneOf,(??))
-import Lens.Family.Total hiding ((&))
 import           Control.Monad
 import           Control.Monad.Cont
 import           Control.Monad.Reader
 import           Control.Monad.Writer
 import           Control.Monad.Error.Lens
-import  Text.PrettyPrint (render,vcat)
+import  Text.PrettyPrint (render)
 
 import           Control.Monad.State
-import Data.Functor
-import Data.List
-import Data.Maybe
 import           TF.Util
-import qualified TF.Types as T
 import           TF.Types hiding (word, CheckerM')
-import           Text.Parsec hiding (token)
 -- import Data.Data
-import Data.Typeable
 import qualified TF.Printer as P
-import qualified Data.Map as M
 
 import TF.Errors
 

@@ -1,11 +1,9 @@
-{-# LANGUAGE TupleSections, RecordWildCards, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+{-# LANGUAGE TupleSections,  FlexibleContexts, RankNTypes,  NoMonomorphismRestriction  #-}
 
 module TF.WordsBuilder where
 
 import Prelude hiding (until, drop, Word)
 import           Control.Lens 
-import Control.Applicative
-import           Control.Error
 import           TF.ForthTypes as FT
 import           Control.Monad
 import           Control.Monad.Reader
@@ -13,7 +11,6 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.State hiding (state)
 import           Control.Monad.Free
 -- import           Control.Monad.State hiding (state)
-import Control.Arrow (second)
 import           TF.StackEffectParser (parseEffect, defParseStackEffectsConfig)
 import qualified Data.Text as Te
 import           TF.Types 

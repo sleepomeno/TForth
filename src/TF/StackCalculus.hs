@@ -1,34 +1,20 @@
 {-# LANGUAGE FlexibleContexts #-}
+
 module TF.StackCalculus
        (applyRule1, applyRule2, applyRule3, applyRule4, applyRules)
        where
 
-import Data.String
-import Control.Arrow 
 import           Control.Error as E
 import           Control.Monad.Reader
 import           Control.Lens hiding (noneOf,(??))
 -- import           Control.Monad.Trans.Either (runEitherT, EitherT)
-import Lens.Family.Total hiding ((&))
-import           Control.Monad
-import           Control.Monad.Error.Lens
-import  Text.PrettyPrint (render,vcat)
-import TF.WildcardRules
+import  Text.PrettyPrint (render)
 
-import           Control.Monad.State
-import Data.Functor
-import Data.List
 import Data.Maybe
 import           TF.Util
 
-import qualified TF.Types as T hiding (isSubtypeOf)
 import           TF.Types hiding (isSubtypeOf, word)
-import           Text.Parsec hiding (token)
-import Data.Data
-import Data.Typeable
 import qualified TF.Printer as P
-import qualified Data.Map as M
-import qualified Data.Set as S
 import TF.SubtypeUtil (isSubtypeOf)
 
 applyRule1 :: (StackEffect, StackEffect) -> MaybeT StackRuleM StackEffect
@@ -47,13 +33,13 @@ applyRule1 (stE1,stE2) = do
   -- iop $ "stE2"
   -- iop $ render . P.stackEffect $ stE2
 
-  iop $ "Rule 1 will be applied"
+  iop "Rule 1 will be applied"
   -- Rule 1 is applicable if @after@ of state is empty
   let beforeTypes2 = stE2 ^. before 
       toTypes2 = stE2 ^. after 
   
   return $ stE1 &~ before %= (++ beforeTypes2) &~ after .= toTypes2
-           &~ streamArgs %= (++ (view streamArgs stE2)) & streamArgs %~ resolveArgs
+           &~ streamArgs %= (++ view streamArgs stE2) & streamArgs %~ resolveArgs
 
 resolveArgs :: [DefiningOrNot] -> [DefiningOrNot]
 resolveArgs  = id -- filter (either (view resolved >>> isNothing) (view resolved >>> isNothing)) 
@@ -71,9 +57,9 @@ applyRule2 (stE1,stE2) = do
     void typeClash
 
   assert $ null before2
-  iop $ "Rule 2 will be applied"
+  iop "Rule 2 will be applied"
   -- Rule 2 is applicable if @before@ of the word is empty
-  return $ stE1 &~ after %= (after2 ++) &~ streamArgs %= (++ (view streamArgs stE2)) & streamArgs %~ resolveArgs
+  return $ stE1 &~ after %= (after2 ++) &~ streamArgs %= (++ view streamArgs stE2) & streamArgs %~ resolveArgs
 
 ---- Rule 3 ------
 applyRule3 :: (StackEffect, StackEffect) -> MaybeT StackRuleM StackEffect
@@ -85,7 +71,7 @@ applyRule3 (stE1, stE2) = do
     (topOfArgs,_)  <- hoistMaybe $ preview (before.traverse) stE2
     typesMatch <- lift $ lift $ lift $ topOfStack `isSubtypeOf` topOfArgs
     assert (not typesMatch)
-    iop $ "Rule 3 will beapplied"
+    iop  "Rule 3 will beapplied"
     iop $ "Top of stack: " ++ (show topOfStack)
     iop $ "Top of args: " ++ (show topOfArgs)
     -- Rule 3 is applicable if the top of stack of both effects match
@@ -121,7 +107,7 @@ typeClash = do
   -- let clash :: EitherT SemState (ReaderT CheckEffectsConfig CheckerM) StackEffect
   let clash :: ExceptT SemState (ReaderT CheckEffectsConfig CheckerM) StackEffect
       clash = hoistEither (Left checkState')
-  lift $  clash
+  lift  clash
 
 
 assert :: Bool -> MaybeT StackRuleM ()

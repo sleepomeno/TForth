@@ -1,27 +1,21 @@
+{-# OPTIONS -fno-warn-missing-signatures  #-}
+{-# OPTIONS -fno-warn-name-shadowing  #-}
+{-# OPTIONS -fno-warn-missing-fields  #-}
 {-# LANGUAGE MultiWayIf, LambdaCase, OverloadedStrings #-}
+
 module TF.Main where
 
-import           Control.Error
 import           Control.Lens
-import           Control.Monad
-import           Control.Monad.Trans.Class
+import           TF.CallChecker               (runChecker')
+import TF.Errors
+import        qualified   TF.ForthTypes as FT 
+import         TF.ForthTypes (symbol, TypeSymbol(N, U, Char))
+import           TF.Types                     as Types
+import           TF.WordsBuilder (parsing, effect)
 
-import           Data.Functor
-import           TF.ForthTypes as FT
-import qualified Data.Map                     as M
-import           Data.String
 import Data.List (isInfixOf)
-import           Lens.Family.Total            hiding ((&))
 import           Test.Hspec                   hiding (after, before)
 import           Test.Hspec.Expectations.Lens
-import           Test.Hspec.Lens              hiding (after, before)
-import           Test.QuickCheck
-import           TF.CallChecker               (runChecker, runChecker', checkFile)
-import           TF.Types                     as Types
-import           TF.Util
-import           TF.WordsBuilder (parsing, effect)
-import qualified Data.Set as S
-import TF.Errors
 
 _ParseState = _2
 _Success = _Right
@@ -51,7 +45,7 @@ checker1 = ParseConfig {}
     & allowCasts                   .~ False
     & allowOOP                     .~ False
     & allowDynamicInStackComments  .~ False
-    & subtypes                     .~ (const [])
+    & subtypes                     .~ const []
 
 checker2 = checker1
     & allowMultipleEffects         .~ False
@@ -63,12 +57,9 @@ checker3 = checker2
 
 checker4 = checker2
    & allowCasts                    .~ False
-   & subtypes .~ (\x ->
-                   if | x == flag -> [ n ]
+   & subtypes .~ (\t ->
+                   if | t == FT.flag -> [ FT.n ]
                       | True         -> [ ])
-
-
-    
 
 exampleConf :: ParseConfig
 exampleConf = ParseConfig {}
@@ -82,7 +73,7 @@ exampleConf = ParseConfig {}
                 & allowDynamicInStackComments .~ False
                 & allowCasts .~ True
                 & allowForcedEffects .~ True
-                & subtypes .~ (const [])
+                & subtypes .~ const []
                 & allowOOP .~ True
                 & thirdParty .~ [do { parsing "random"; effect "( n -- n )" }]
 
@@ -98,7 +89,7 @@ defTestConfig = ParseConfig {}
                 & allowDynamicInStackComments .~ False
                 & allowCasts .~ False
                 & allowForcedEffects .~ False
-                & subtypes .~ (const [])
+                & subtypes .~ const []
                 & allowOOP .~ False
                 & thirdParty .~ []
 
@@ -170,20 +161,20 @@ allowLocalFailureFeature = do
   context "Given an invalid word definition:" $ do
     it "type checks a program where that word is not used" $
         check ": foo bl + ;" `shouldHave`  _Success
-    it "creates a dictionary entry for that word" $ do
+    it "creates a dictionary entry for that word" $ 
         check ": foo 3 0= + ;" `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition._2._Failed)
 
     it "type clashes on using that word top-level" $
         check ": foo 4 0= + ; 9 foo" `shouldHave` (_Failure._ErrorT._ClashInWord)
     it "using that word in another word definition results in the correct FAILED reason" $ do
         let prog = ": foo 0 0= + ; : bar foo ;"
-        check prog `shouldHave` (_Success._2.definedWords'.at "bar"._Just._ColonDefinition._2._Failed.filtered (\x -> "foo" `isInfixOf` x))
+        check prog `shouldHave` (_Success._2.definedWords'.at "bar"._Just._ColonDefinition._2._Failed.filtered (\bar -> "foo" `isInfixOf` bar))
 
 simpleColonDefinition = do
   let check = fst . runChecker' defTestConfig
 
       getColonDefEffects w program =
-        ((preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program)) :: Maybe [StackEffect])
+        preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program) :: Maybe [StackEffect]
       effectsOfColonDefinition = _ColonDefinition._2._Checked._1
 
       name = "myword"
@@ -193,14 +184,14 @@ simpleColonDefinition = do
 
       check simpleColonDefinition `shouldHave` _Success
 
-  it "has made a new dictionary entry" $ do
+  it "has made a new dictionary entry" $ 
     check simpleColonDefinition `shouldHave` (_Success._ParseState.definedWords'.at name._Just.effectsOfColonDefinition)
 
-  it "has compiled a single stack effect" $ do
+  it "has compiled a single stack effect" $ 
     check simpleColonDefinition `shouldHave` (_Success._ParseState.definedWords'.at name._Just.effectsOfColonDefinition.to length.only 1)
 
   it "has compiled the correct stack effect" $ do
-    let effect = (getColonDefEffects name simpleColonDefinition) ^?! (_Just._head)
+    let effect = getColonDefEffects name simpleColonDefinition ^?! (_Just._head)
 
     let afterStack = effect ^. after
 
@@ -224,8 +215,8 @@ simpleColonDefinition = do
   it "has compiled the correct stack effect 2" $ do
     let effect' = getColonDefEffects "foo" ": foo dup 3 + ;"
 
-    effect' `shouldHave` _Just._head.before._head._1._NoReference._PrimType.filtered (views symbol (== N))
-    effect' `shouldHave` _Just._head.after._head._1._NoReference._PrimType.filtered (views symbol (== N))
+    effect' `shouldHave` _Just._head.before._head._1._NoReference._PrimType.filtered (views symbol (== FT.N))
+    effect' `shouldHave` _Just._head.after._head._1._NoReference._PrimType.filtered (views symbol (== FT.N))
 
 colonDefStackComment = do
   let check = fst . runChecker' (defTestConfig & allowForcedEffects .~ True)
@@ -281,16 +272,16 @@ create = do
   let check = fst . runChecker' defTestConfig
 
       getColonDefEffects w program =
-        ((preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program)) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program) :: Maybe [StackEffect]) ^?! _Just
       getCreateDefEffects w program =
-        ((preview (_Right._2.definedWords'.at w._Just._CreateDefinition) (check program)) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_Right._2.definedWords'.at w._Just._CreateDefinition) (check program) :: Maybe [StackEffect]) ^?! _Just
   it "when a colon definition's body contains 2 'create' the compiled effect contains two defining arguments" $ do
     let name = "myfunc"
         colonDef = ": myfunc create create ;"
         effects = getColonDefEffects name colonDef
 
     let getDefiningArgs = _head.streamArgs.traverse._Defining
-        args = (toListOf getDefiningArgs effects) :: [DefiningArg]
+        args = toListOf getDefiningArgs effects :: [DefiningArg]
 
 
     effects `shouldHave` _head.streamArgs.traverse._Defining
@@ -302,7 +293,7 @@ create = do
           name1 = "foo"
           name2 = "bar"
 
-      it "type checks" $ do
+      it "type checks" $ 
 
         check colonDef `shouldHave` _Success
 
@@ -316,7 +307,7 @@ create = do
     it "where the create does not have a comma and constraints the type" $ do
       let prog =  ": foo create does> @ 4 + ; foo bla"
           bla = getCreateDefEffects "bla" prog
-      bla `shouldHave` _head.after._head._1._NoReference._PrimType.symbol.only N
+      bla `shouldHave` _head.after._head._1._NoReference._PrimType.FT.symbol.only FT.N
 
       let foo = getColonDefEffects "foo" prog
       foo `shouldHave` _head.streamArgs._head._Defining.runtimeEffect._Just._head._1.after._head._1._NoReference._PrimType.symbol.only N
@@ -359,17 +350,17 @@ create = do
       bar `shouldHave` element 1.before._head._1._NoReference._PrimType.symbol.only N
       bar `shouldHave` element 1.after._head._1._NoReference._PrimType.symbol.only N
 
-    it "and the resulting word's type was constrained by comma outside the initial create and later a wrong type gets stored in it" $ do
+    it "and the resulting word's type was constrained by comma outside the initial create and later a wrong type gets stored in it" $ 
       check "9 : foo create , ; foo bla 8 0= bla !" `shouldHave` (_Failure._Clash)
 
   context "when the compiled effect of a word demands a stream argument" $ do
-    it "a wrong word stack effect is rejected" $ do
+    it "a wrong word stack effect is rejected" $ 
       check ": foo ( x D'name':[ n ] -- ) create , ;" `shouldHave` (_Failure._NotMatchingStackComment)
-    it "a correct stack effect is approved" $ do
+    it "a correct stack effect is approved" $ 
       check ": foo ( n D'name':[ n ] -- ) create , ;" `shouldHave` _Success
     let name = "myfunc"
         colonDef = ": myfunc create ;"
-    context "when the created word is of unknown type" $ do
+    context "when the created word is of unknown type" $
       it "the dictionary entry's effect contains exactly a stream argument" $ do
         let effects = getColonDefEffects name colonDef
 
@@ -491,49 +482,48 @@ assertions = do
   let check = fst . runChecker' (defTestConfig & allowLocalFailure .~ True)
 
       getColonDefEffects w program =
-        ((preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program)) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program) :: Maybe [StackEffect]) ^?! _Just
       getCreateDefEffects w program =
-        ((preview (_Right._2.definedWords'.at w._Just._CreateDefinition) (check program)) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_Right._2.definedWords'.at w._Just._CreateDefinition) (check program) :: Maybe [StackEffect]) ^?! _Just
   it "throws an error failure" $ do
     let program = ": foo 2 3 ( Assert xt ) + ;"
         result = fst $ runChecker' (defTestConfig & allowLocalFailure .~ False) program
     result `shouldHave` (_Failure._TypeClash)
 
-  it "validates correct assertions for the top part of the stack" $ do
+  it "validates correct assertions for the top part of the stack" $ 
     check   ": foo 2 3 ( Assert n ) + ;" `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition._2._Checked._1)
 
-  it "rejects incorrect forced assertion which does not mention whole stack" $ do
+  it "rejects incorrect forced assertion which does not mention whole stack" $ 
     check   ": foo 2 3 ( Assert! n ) + ;"  `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition._2._Failed)
 
-  it "rejects incorrect forced assertion which mentions more than is on the stack" $ do
+  it "rejects incorrect forced assertion which mentions more than is on the stack" $ 
     check   ": foo 3 ( Assert! n n ) + ;"  `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition._2._Failed)
 
-  it "validates correct assertions" $ do
+  it "validates correct assertions" $ 
     check   ": foo 2 3 ( Assert n n ) + ;" `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition._2._Checked._1)
 
   context "in a tick construct" $ do
     context "which is executed" $ do
       it "and pretty simple" $
         check ": foo ( n n -- n ) + ; ' foo" `shouldHave` _Success
-      it "correctly asserting the xd resulting from tick" $ do
+      it "correctly asserting the xd resulting from tick" $ 
         check ": foo ( n n -- n ) + ; ' foo ( Assert xt:[ n n -- n ] )" `shouldHave` _Success
-      it "correctly rejecting a wrong assertion with respect to the xd resulting from tick" $ do
+      it "correctly rejecting a wrong assertion with respect to the xd resulting from tick" $ 
         check ": foo ( n n -- n ) + ; ' foo ( Assert xt:[ n xd -- n ] )" `shouldHave` (_Failure._Clash)
     context "which is compiled" $ do
-      it "with no word stack comment" $ do
+      it "with no word stack comment" $ 
         check  ": foo ; : bla foo ( 'addition':[ n n -- n ] -- ) ' ;"  `shouldHave` (_Success._2.definedWords'.at "bla"._Just._ColonDefinition._2._Checked._1)
-      it "with a word stack stack comment" $ do
+      it "with a word stack stack comment" $ 
         check   ": bla ( 'addition':[ n n -- n ] -- xt:[ n n -- n ] ) ( 'addition':[ n n -- n ] -- ) ' ;" `shouldHave` (_Success._2.definedWords'.at "bla"._Just._ColonDefinition._2._Checked._1)
 
-  context "in an execute construct" $ do
-    it "which is compiled" $ do
+  context "in an execute construct" $ 
+    it "which is compiled" $ 
       check  ": foo ; : bla foo ( Assert xt:[ n n -- n ] ) execute ;"  `shouldHave` (_Success._2.definedWords'.at "bla"._Just._ColonDefinition._2._Checked._1)  
   
 
 immediate = do
   let check = fst . runChecker' defTestConfig
-      getColonDefEffects w program =
-        ((preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program)) :: Maybe [StackEffect])
+      getColonDefEffects w program = preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program) :: Maybe [StackEffect]
   it "postponing an immediate word just undoes the immediate nature" $ do
       let program = ": foo + ; immediate : bla postpone foo ;"
           effects1 :: Maybe [StackEffect]
@@ -561,23 +551,19 @@ main :: IO ()
 main = hspec $
   describe "runChecker'" $ do
     let check = fst . runChecker' defTestConfig
-        getCreateDefEffects w program = ((preview (_Right._2.definedWords'.at w._Just._CreateDefinition) (check program)) :: Maybe [StackEffect]) ^?! _Just
+        getCreateDefEffects w program = (preview (_Right._2.definedWords'.at w._Just._CreateDefinition) (check program) :: Maybe [StackEffect]) ^?! _Just
         getColonDefEffects w program =
-          ((preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program)) :: Maybe [StackEffect])
+          preview (_Right._2.definedWords'.at w._Just._ColonDefinition._2._Checked._1) (check program) :: Maybe [StackEffect]
 
 
-    describe "Allow failure of colon definition type checking if it is not used:" $
-      allowLocalFailureFeature
+    describe "Allow failure of colon definition type checking if it is not used:"  allowLocalFailureFeature
 
-    context "Checking simple stack calculus" $
-      simpleStackCalculus
+    context "Checking simple stack calculus"  simpleStackCalculus
 
-    context "When provided with a valid colon definition" $
-      simpleColonDefinition
+    context "When provided with a valid colon definition" simpleColonDefinition
 
 
-    context "when a word definition has a defined stack effect comment" $ do
-      colonDefStackComment
+    context "when a word definition has a defined stack effect comment" colonDefStackComment
 
     context "when provided with an if expression in a word definition" $ do
       let name = "myfunc"
@@ -589,8 +575,7 @@ main = hspec $
 
     immediate
 
-    context "handling defining stream arguments" $
-      create
+    context "handling defining stream arguments" create
 
     it "type checking fails when an immediate word leaves something on the stack at compile time" $ do
        let program = ": foo + ; immediate : bar [ 3 2 ] foo ;"
@@ -611,8 +596,7 @@ main = hspec $
     it "parses an xt without effect in stack effect and clashes on not matching stack comment" $
           check  ": foo ( xt -- ) + ;" `shouldHave` (_Left._TypeClash._NotMatchingStackComment)
 
-    context "type checks subtyping" $ do
-      subtyping
+    context "type checks subtyping" subtyping
 
     it "given a colon definition with 'literal' in it, the compiled effect is correct" $ do
       let name = "foo"
@@ -620,11 +604,9 @@ main = hspec $
           effects = getColonDefEffects name colonDef
       effects `shouldHave` _Just._head.after._head._1._NoReference._PrimType.symbol.filtered (== FT.Char)
 
-    context "OOP Features" $
-      oopFeature
+    context "OOP Features" oopFeature
     
-    context "respects assertions" $ do
-      assertions
+    context "respects assertions" assertions
 
     context "Handles casts" cast
 

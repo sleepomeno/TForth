@@ -1,21 +1,17 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+{-# LANGUAGE   FlexibleContexts,  TemplateHaskell  #-}
 
 module TF.StackEffectParser
        (parseAssertion', defParseStackEffectsConfig, parseEffect, getEffect, parseCast', parseFieldType)
        where
 
-import           Control.Applicative hiding (optional, (<|>),many)
 import           Control.Arrow hiding (left)
 import Control.Error
-import Lens.Family.Total hiding ((&))
 import Control.Monad.Error.Lens
 import           Control.Monad.State
 import           Control.Monad.Reader
 import           Data.Char hiding (Control)
-import           Data.Functor.Identity
 import           Control.Lens hiding (to, from,noneOf)
-import           TF.Types as T hiding (stack, streamArguments)
+import           TF.Types as T hiding (streamArguments)
 import           TF.ForthTypes as FT
 import           TF.Util
 import           Text.Parsec as P
@@ -31,7 +27,7 @@ data ParseStackState = ParseStackState {
                              , _streamArguments :: [[DefiningOrNot]]
                              , _forced :: Bool
                              }  deriving (Show, Eq, Read)
-$(makeLenses ''ParseStackState)
+makeLenses ''ParseStackState
 
 
 data ParseStacksState = ParseStacksState {
@@ -41,7 +37,7 @@ data ParseStacksState = ParseStacksState {
                               , _forced' :: Bool
                              , _isIntersect :: Bool
                               } deriving (Show, Eq, Read)
-$(makeLenses ''ParseStacksState)
+makeLenses ''ParseStacksState
 
 type ParseStackEffectsM = ParsecT String ParseStacksState (Reader ParseStackEffectsConfig)
 
@@ -307,7 +303,7 @@ parseAssertion'' = void $ do
   string "("
   atLeastOneSpace
 
-  forced <- try (string "assert!") *> return True <|> (string "assert") *> return False
+  forced <- try (string "assert!") *> return True <|> string "assert" *> return False
   atLeastOneSpace
 
   results <- parseStackImage `sepBy1` P.char '/' 
@@ -380,6 +376,6 @@ allEffects i' = [(f''',t''') | f'' <- f', f''' <- f'', t'' <- t', t''' <- t'']
            (f',t') = i' & both %~ map sequence
 
 runStackEffectParser :: String -> ParseStackEffectsConfig -> Either ParseError ParseStacksState
-runStackEffectParser t config = flip runReader config $ (runParserT (parseStackEffects >> getState) def "" t)
+runStackEffectParser t config = flip runReader config $ runParserT (parseStackEffects >> getState) def "" t
                                            
 

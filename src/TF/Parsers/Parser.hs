@@ -1,42 +1,28 @@
-{-# LANGUAGE LambdaCase,OverloadedStrings, TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+{-# LANGUAGE LambdaCase,OverloadedStrings, TupleSections   #-}
 
 module TF.Parsers.Parser (parseProgram) where
 
 import Prelude hiding (Word)
-import           Control.Applicative hiding (optional, (<|>),many)
 
 import Control.Lens hiding (noneOf,(??))
 import Lens.Family.Total hiding ((&))
 import           Control.Error as E
-import  Text.PrettyPrint (render,vcat)
-import Control.Arrow (second, first)
-import Data.Data
-import Data.List
 import Data.Monoid
 import TF.Evaluator
-import           TF.WordsBuilder (buildWord')
-import           TF.StackEffectParser (parseFieldType, parseEffect, defParseStackEffectsConfig, parseCast', parseAssertion')
-import Control.Monad.Error
+import           TF.StackEffectParser (defParseStackEffectsConfig)
 import           Control.Monad.State hiding (state)
-import           Control.Monad.Reader (local, runReaderT, ask)
+import           Control.Monad.Reader (local, runReaderT)
 import           Control.Monad.Error.Lens
-import           Control.Monad.Free
 -- import           Control.Monad.Trans.Free
-import           Data.Char hiding (Control)
 import qualified Data.Map as M
-import qualified Data.Set as S
 import           TF.Types hiding (state, isSubtypeOf)
-import qualified TF.Types as T
-import qualified TF.Words as W hiding (coreWords')
+import qualified TF.Words as W 
 import           TF.Checker (checkNodes)
-import           TF.CheckerUtils (withEmpty, withEmpty''')
+import           TF.CheckerUtils (withEmpty)
 import  TF.Util
 import qualified Data.Text as Te
-import           Data.Maybe
 import           Text.Parsec hiding (runParser, anyToken, (<|>))
-import qualified TF.Printer as P
 import TF.Errors
-import Debug.Trace
 
 import TF.Parsers.OOP
 import TF.Parsers.ControlStructures
@@ -61,8 +47,7 @@ parseProgram = do
     liftUp $ throwing _UnemptyStack ("Top Level", "'Before's of top level stack effects must be empty!")
 
 parseNode :: CheckerM Node
-parseNode = do
-  parseNodeWithout []
+parseNode = parseNodeWithout []
 
 parseNodeWithout :: [Word] -> CheckerM Node
 parseNodeWithout ws = do
@@ -88,7 +73,7 @@ parseWord :: Te.Text -> CheckerM ParsedWord
 parseWord w = do
   coreWords <- use wordsMap
   let maybeWord = M.lookup (new _WordIdentifier w) coreWords
-  when (isNothing maybeWord) $ throwing _Impossible $ ("Did not find word " <> (Te.unpack w))
+  when (isNothing maybeWord) $ throwing _Impossible ("Did not find word " <> Te.unpack w)
   let w'' = maybeWord ^?! _Just
     
   (Right w') <- satisfy' (== Right w'')
