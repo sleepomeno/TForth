@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, FlexibleContexts,
              FlexibleInstances, FunctionalDependencies, LambdaCase, MultiWayIf,
-             NoMonomorphismRestriction, OverlappingInstances, OverloadedStrings,
+             NoMonomorphismRestriction, OverloadedStrings,
              RankNTypes, RecordWildCards, TemplateHaskell, TupleSections,
              TypeFamilies #-}
 

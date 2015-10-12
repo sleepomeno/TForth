@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, MultiWayIf,OverlappingInstances, TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, OverloadedStrings,  TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+{-# LANGUAGE LambdaCase, MultiWayIf,TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, OverloadedStrings,  TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
 
 
 module TF.CallChecker where

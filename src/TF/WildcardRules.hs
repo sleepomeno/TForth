@@ -1,4 +1,4 @@
-{-# LANGUAGE ImpredicativeTypes, OverloadedStrings, LambdaCase, MultiWayIf,OverlappingInstances, TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
+{-# LANGUAGE ImpredicativeTypes, OverloadedStrings, LambdaCase, MultiWayIf,TupleSections, DeriveDataTypeable, TypeFamilies, FunctionalDependencies, RecordWildCards, FlexibleContexts, RankNTypes, TemplateHaskell,  DeriveFunctor, NoMonomorphismRestriction, FlexibleInstances #-}
 
 module TF.WildcardRules (sameDegree,renameWildcards, oldWildcardDegreeIsGreater, newWildcardDegreeIsGreater, oldTopTypeNotWildcard, newTopTypeNotWildcard) where 
 
