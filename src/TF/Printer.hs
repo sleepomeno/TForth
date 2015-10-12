@@ -96,8 +96,9 @@ bTypeNice (ExecutionType (ExecutionToken _ runtimeSpec)) = text "xt:[" <+> case 
   Just runtime -> case runtime of
     NoR -> text "NoR"
     UnknownR arg -> text "UnknownR"
-    KnownR eff -> stackEffectNice (toStackEffect eff)
-    ResolvedR arg eff -> stackEffectNice (toStackEffect eff)
+    KnownR eff -> stackEffectNice eff
+    ResolvedR arg eff -> stackEffectNice eff
+  
                        
 stackEffectNice (StackEffect b args a ) = text "(" <+> (hsep $ showTypes $ reverse b) <+> (hsep $ map definingOrNot args) <+> text " -- " <+> (hsep $ showTypes $ reverse a) <+> text ")"
   where

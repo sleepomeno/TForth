@@ -91,7 +91,7 @@ instance HasStackEffects Expr where
                         Nothing -> return result
                         Just doesEffects -> do
                           -- let newCreating = create & (elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0).runtimeEffect ?~ _RuntimeNotProcessed # (doesEffects & traverse.both %~ (\(StackEffect x y z) -> (x,y,z)))
-                          let newCreating = create & (elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0).runtimeEffect ?~ (doesEffects & traverse.both %~ (\(StackEffect x y z) -> (x,y,z)))
+                          let newCreating = create & (elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0).runtimeEffect ?~ (doesEffects)
                           go (newCreating, exprs, comma, Nothing)
 
 
@@ -161,7 +161,7 @@ instance HasStackEffects Expr where
         setEffect = \case
           UnknownR i -> ResolvedR i runtimeEff''-- (effect ^. from stackEffectIso)
           x          -> x
-    let resolvedRuntimes = pw' ^.. stacksEffects._CompiledEff._Wrapped.traverse.streamArgs.traverse._NotDefining.runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect')]
+    let resolvedRuntimes = pw' ^.. stacksEffects._CompiledEff._Wrapped.traverse.streamArgs.traverse._NotDefining.runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
         pw'' = pw' & stacksEffects._CompiledEff._Wrapped.traverse %~ ((before.traverse %~ resolveRuntimeType resolvedRuntimes) . (after.traverse %~ resolveRuntimeType resolvedRuntimes))
 
     getStackEffects (KnownWord pw'')
@@ -176,7 +176,7 @@ instance HasStackEffects Expr where
     let xts = toListOf (after.traverse._1._NoReference._ExecutionType.runtimeSpecified._Just._KnownR) effect
     unless (1 == length xts) $ throwing (_ErrorE . _MalformedAssert) "Exactly one xt data type!"
 
-    let eff = xts ^?! _head.stackEffectIso
+    let eff = xts ^?! _head
 
     let compOrExec = if has _Compiled effects' then (_Compiled #) else (_Executed #)
 

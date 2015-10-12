@@ -166,7 +166,7 @@ tellExpr expr = do
   lift . lift $ tell (Info [(expr, d)] [] [])
 
 
-resolveRuntimeType :: [(UniqueArg, StackEffect')] -> IndexedStackType -> IndexedStackType
+resolveRuntimeType :: [(UniqueArg, StackEffect)] -> IndexedStackType -> IndexedStackType
 resolveRuntimeType resolvedRuntimes (t, i') = (setBaseType newType t, i')
   where
     newType = case baseType' t of

@@ -48,12 +48,11 @@ data BasicType = ClassType ClassName
 
 type IndexedStackType = (DataType, Maybe Int)
                         
--- |This is just isomorphic to 'StackEffect'. It is needed because I
-                        -- got problems with cyclic dependencies in
-                        -- light of using lens library with template
-                        -- haskell for some reason
-type StackEffect' = ([IndexedStackType],[Either DefiningArg StreamArg],[IndexedStackType])
-
+type UniqueArg = Int
+data RuntimeSpecification = NoR |
+                            UnknownR UniqueArg |
+                            KnownR StackEffect |
+                            ResolvedR UniqueArg StackEffect deriving (Show,Read,Eq,Data,Typeable, Ord)
 data ExecutionToken = ExecutionToken { _executiontokenSymbol :: TypeSymbol
                                      , _executiontokenRuntimeSpecified :: Maybe RuntimeSpecification
                                      } deriving (Show,Ord,Read,Eq,Data,Typeable)
@@ -95,6 +94,22 @@ type SpacesDelimitedParsing = String
 --                                               , delimiter :: String
 --                                               } deriving (Show,Read,Eq,Data,Typeable)
 
+data DefiningArg = DefiningArg {
+                      _definingName :: String
+                    , _definingResolved :: Maybe String
+                    , _definingArgType :: Maybe IndexedStackType
+                    , _definingEndDelimiter :: Maybe String
+
+                    -- , _defargRuntimeEffect :: Maybe (Either [(StackEffect,StackEffect)] [(StackEffect,StackEffect)])
+                    , _definingRuntimeEffect :: Maybe [(StackEffect,StackEffect)]
+                      -- the effect specification in comments:
+                    , _definingRuntimeSpecified :: Maybe StackEffect 
+                    -- , _defargRuntimeChecked :: Bool
+                    }  deriving (Show,Read,Eq,Data,Typeable, Ord)
+
+
+type DefiningOrNot = Either DefiningArg StreamArg
+
 data StreamArg = StreamArg {
                        _streamName :: String
                      , _streamResolved :: Maybe String
@@ -102,31 +117,19 @@ data StreamArg = StreamArg {
                      , _streamRuntimeSpecified :: Maybe RuntimeSpecification
                     } deriving (Show,Read,Eq,Data,Typeable, Ord)
 
-type UniqueArg = Int
-data RuntimeSpecification = NoR |
-                            UnknownR UniqueArg |
-                            KnownR StackEffect' |
-                            ResolvedR UniqueArg StackEffect' deriving (Show,Read,Eq,Data,Typeable, Ord)
-
-data DefiningArg = DefiningArg {
-                      _definingName :: String
-                    , _definingResolved :: Maybe String
-                    , _definingArgType :: Maybe IndexedStackType
-                    , _definingEndDelimiter :: Maybe String
-
-                    -- , _defargRuntimeEffect :: Maybe (Either [(StackEffect',StackEffect')] [(StackEffect',StackEffect')])
-                    , _definingRuntimeEffect :: Maybe [(StackEffect',StackEffect')]
-                      -- the effect specification in comments:
-                    , _definingRuntimeSpecified :: Maybe StackEffect' 
-                    -- , _defargRuntimeChecked :: Bool
-                    }  deriving (Show,Read,Eq,Data,Typeable, Ord)
+------ StackEffect -----
+data StackEffect = StackEffect {
+                  _stackeffectBefore :: [IndexedStackType]
+               ,  _stackeffectStreamArgs :: [DefiningOrNot]
+               ,  _stackeffectAfter :: [IndexedStackType]
+                 }  deriving (Show, Ord, Read, Eq, Data, Typeable, Generic)
+makeFields ''StackEffect
 
 
 type DataArgOrStreamArg a b = Either a b
 _DataType = _Left
 _StreamArg = _Right
 
-type DefiningOrNot = Either DefiningArg StreamArg
 type StackArg = DataArgOrStreamArg [IndexedStackType] DefiningOrNot
 type StackArg' = DataArgOrStreamArg IndexedStackType DefiningOrNot
 type StackArg'' = DataArgOrStreamArg IndexedStackType DefiningOrNot
@@ -238,19 +241,6 @@ newtype UnresolvedArgsTypesState = UnresolvedArgsTypesState {
 }  deriving (Show, Read, Eq, Data, Typeable, Generic)
 makeFields ''UnresolvedArgsTypesState
 
------- StackEffect -----
-data StackEffect = StackEffect {
-                  _stackeffectBefore :: [IndexedStackType]
-               ,  _stackeffectStreamArgs :: [DefiningOrNot]
-               ,  _stackeffectAfter :: [IndexedStackType]
-                 }  deriving (Show, Read, Eq, Data, Typeable, Generic)
-makeFields ''StackEffect
-
-stackEffectIso :: Simple Iso StackEffect' StackEffect
-stackEffectIso = iso toStackEffect toStackEffect'
-
-toStackEffect (x,y,z) = StackEffect x y z
-toStackEffect' (StackEffect x y z) = (x,y,z)
 
 type DataStackEffect = [StackEffect]
 type SingleSemiEffect = [StackArg]
@@ -410,8 +400,8 @@ data ParseState = ParseState {
                  , _classInterfaces :: M.Map ClassName [(Method, OOMethodSem)]
                  , _classFields :: M.Map ClassName [(Variable, OOFieldSem)]
                  , _subtypeRelation :: S.Set (BasicType, BasicType)
-                 , _unresolvedArgsTypes :: M.Map Identifier StackEffect'
-                 , _inputStreamAssertions :: [StackEffect']
+                 , _unresolvedArgsTypes :: M.Map Identifier StackEffect
+                 , _inputStreamAssertions :: [StackEffect]
 
                } deriving (Show, Read, Data, Typeable, Eq)
 makeLenses ''ParseState

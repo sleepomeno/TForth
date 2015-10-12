@@ -113,7 +113,7 @@ evalKnownWord w' = do
           guard rFS
           args' <- args
           resolvedArgs <- lift $ resolveStreamArgs args' []
-          let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining.runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect')]
+          let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining.runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
               -- return $ effs & (traverse.streamArgs .~ resolvedArgs ) & (traverse.before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse.after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
           return $ kw & stacksEffects._ExecutedEff._Wrapped.traverse %~ ((streamArgs .~ resolvedArgs) . (before.traverse %~ resolveRuntimeType resolvedRuntimes) . (after.traverse %~ resolveRuntimeType resolvedRuntimes))
 
@@ -165,7 +165,7 @@ evalColonDefinition (colonDef, effs')  = do
 
   effs' <- if executed then do
               resolvedArgs <- resolveStreamArgs args []
-              let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining.runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect')]
+              let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining.runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
               -- return $ effs & (traverse.streamArgs .~ resolvedArgs ) & (traverse.before.traverse.filtered (\(t, _) -> has (_NoReference._ExecutionType.runtimeSpecified._Just._UnknownR) (baseType' t))) %~ (resolveRuntimeType resolvedRuntimes)
               return $ effs & (traverse.streamArgs .~ resolvedArgs ) & (traverse.before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse.after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
 
@@ -253,20 +253,20 @@ handleHOTstreamArgument arg@(Right (StreamArg _ _ _ (Just (UnknownR index)))) po
   where
     adjustHOT effs = do
       unless (length effs == 1) $ throwing _MultiHigherOrderArg () -- TODO eher unnoetig. überprüfe weiter unten bei effectIsSubtypeOf ob jeder effekt ein untertyp von mindestens einem typ im just ist!
-      let eff = (effs ^?! _head.from stackEffectIso) :: StackEffect'
+      let eff = (effs ^?! _head) :: StackEffect
 
       iop "THIS IS THE EFF:"
-      iop $ render $ P.stackEffect (eff ^. stackEffectIso)
+      iop $ render $ P.stackEffect eff
       
       s <- getState
-      let eff' = view (unresolvedArgsTypes.at index) s :: Maybe StackEffect'
+      let eff' = view (unresolvedArgsTypes.at index) s :: Maybe StackEffect
 
       -- iop $ "eff'"
       -- iop $ show arg
 
       case eff' of
         Just eff'' -> do
-          isSubtype <- (eff ^. stackEffectIso) `effectIsSubtypeOf` (eff'' ^. stackEffectIso)
+          isSubtype <- eff `effectIsSubtypeOf` eff''
           unless isSubtype $ lift $ throwing _HOTNotSubtype ()
           return $ arg & _NotDefining.runtimeSpecified ?~ ResolvedR index eff''
         Nothing    -> do

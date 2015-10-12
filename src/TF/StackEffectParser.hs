@@ -84,7 +84,7 @@ parseInputStreamArgument = do
           let from' = newState ^. currentEffect.from
               to'   = newState ^. currentEffect.to
           putState oldState
-          return (concat $ concat from', [], concat $ concat to') :: ParseStackEffectsM StackEffect'
+          return $ StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM StackEffect
 
     let parseEndDelimiter = option Nothing $
                             fmap Just $
@@ -218,7 +218,7 @@ parseRuntimeType = optionMaybe $ do
         let from' = newState ^. currentEffect.from
             to'   = newState ^. currentEffect.to
         putState oldState
-        return $ _KnownR # (concat $ concat from', [], concat $ concat to') :: ParseStackEffectsM RuntimeSpecification
+        return $ _KnownR # StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM RuntimeSpecification
   let unknownEffect = do
         atLeastOneSpace
         string "EFF"
