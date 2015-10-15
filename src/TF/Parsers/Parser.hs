@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase,OverloadedStrings, TupleSections   #-}
 
-module TF.Parsers.Parser (parseProgram) where
+module TF.Parsers.Parser (
+  parseProgram
+  ) where
 
 import Prelude hiding (Word)
 

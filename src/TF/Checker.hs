@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts, LambdaCase, MultiWayIf  #-}
 
-module TF.Checker where
+module TF.Checker (
+  checkNodes
+  ) where
 
 import           Control.Arrow
 import           Control.Error            as E

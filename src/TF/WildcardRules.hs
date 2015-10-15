@@ -1,6 +1,13 @@
 {-# LANGUAGE  FlexibleContexts, NoMonomorphismRestriction #-}
 
-module TF.WildcardRules (sameDegree,renameWildcards, oldWildcardDegreeIsGreater, newWildcardDegreeIsGreater, oldTopTypeNotWildcard, newTopTypeNotWildcard) where 
+module TF.WildcardRules (
+    sameDegree
+  , renameWildcards
+  , oldWildcardDegreeIsGreater
+  , newWildcardDegreeIsGreater
+  , oldTopTypeNotWildcard
+  , newTopTypeNotWildcard
+  ) where 
 
 import Control.Arrow 
 import           Control.Lens hiding (noneOf,(??))
@@ -14,7 +21,6 @@ import  Text.PrettyPrint (render)
 import           Control.Monad.State
 import           TF.Util
 import           TF.Types hiding (word, CheckerM')
--- import Data.Data
 import qualified TF.Printer as P
 
 import TF.Errors

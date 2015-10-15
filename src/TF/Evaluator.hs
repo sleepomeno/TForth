@@ -1,10 +1,16 @@
 {-# LANGUAGE MultiWayIf, LambdaCase, TupleSections, FlexibleContexts   #-}
 
-module TF.Evaluator where
+module TF.Evaluator (
+    evalForthWordWithout
+  , evalKnownWord
+  , evalColonDefinition
+  , evalUnknown
+  ) where
 
-import Prelude hiding (Word)
+import Prelude hiding (Word, last)
 
-import Control.Lens hiding (noneOf,(??))
+import Control.Lens hiding (noneOf,(??), children)
+
 import Data.Text.Lens 
 import Lens.Family.Total hiding ((&))
 import           Control.Monad.Cont

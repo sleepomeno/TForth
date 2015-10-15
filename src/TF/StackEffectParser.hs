@@ -1,7 +1,12 @@
-{-# LANGUAGE   FlexibleContexts,  TemplateHaskell  #-}
+{-# LANGUAGE   FlexibleContexts  #-}
 
-module TF.StackEffectParser
-       (parseAssertion', defParseStackEffectsConfig, parseEffect, getEffect, parseCast', parseFieldType)
+module TF.StackEffectParser (
+    parseAssertion'
+  , defParseStackEffectsConfig
+  , parseEffect
+  , getEffect
+  , parseCast'
+  , parseFieldType)
        where
 
 import           Control.Arrow hiding (left)
@@ -11,7 +16,7 @@ import           Control.Monad.State
 import           Control.Monad.Reader
 import           Data.Char hiding (Control)
 import           Control.Lens hiding (to, from,noneOf)
-import           TF.Types as T hiding (streamArguments)
+import           TF.Types as T 
 import           TF.ForthTypes as FT
 import           TF.Util
 import           Text.Parsec as P
@@ -20,45 +25,6 @@ import Debug.Trace
 
 import TF.Errors
 
-data ParseStackState = ParseStackState { 
-                               _from :: [[[IndexedStackType]]]
-                             , _to :: [[[IndexedStackType]]]
-                             -- , _definedWords :: [Definition]
-                             , _streamArguments :: [[DefiningOrNot]]
-                             , _forced :: Bool
-                             }  deriving (Show, Eq, Read)
-makeLenses ''ParseStackState
-
-
-data ParseStacksState = ParseStacksState {
-                                _types :: [PrimType]
-                              , _currentEffect :: ParseStackState
-                              , _previousEffects :: [ParseStackState]
-                              , _forced' :: Bool
-                             , _isIntersect :: Bool
-                              } deriving (Show, Eq, Read)
-makeLenses ''ParseStacksState
-
-type ParseStackEffectsM = ParsecT String ParseStacksState (Reader ParseStackEffectsConfig)
-
--- TODO remove the def
-instance HasDefault ParseStacksState where
-  def = ParseStacksState {}
-                & previousEffects .~ []
-                & currentEffect .~ def
-                & forced' .~ False
-                & types .~ forthTypes
-                & isIntersect .~ False
-
-
-instance HasDefault ParseStackState where
-  def = ParseStackState {}
-                -- & types .~ forthTypes
-                & streamArguments .~ []
-                & from .~ []
-                -- & TF.StackEffectParser.definedWords .~ []
-                & to .~ []
-                & forced .~ False
 
 
 atLeastOneSpace = many1 space
@@ -77,8 +43,8 @@ parseInputStreamArgument = do
           putState def
           _ <- parseStackEffect
           newState <- getState
-          let from' = newState ^. currentEffect.from
-              to'   = newState ^. currentEffect.to
+          let from' = newState ^. currentEffect.before
+              to'   = newState ^. currentEffect.after
           putState oldState
           return $ StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM StackEffect
 
@@ -189,7 +155,7 @@ parseStackEffect = do
 
   let (typesBefore, streamArgs) = unzip . map (lefts &&& rights) $ dataTypesAndStreamArgs
 
-  modifyState $ s.from .~  typesBefore
+  modifyState $ s.before .~  typesBefore
   modifyState $ s.streamArguments .~ streamArgs
 
   forced'' <-  (try (return False <* string "--") <|>
@@ -198,7 +164,7 @@ parseStackEffect = do
   atLeastOneSpace
 
   typesAfter <- parseSemiEffects parseSingleSemiEffectAfter
-  modifyState $ s.to .~  typesAfter
+  modifyState $ s.after .~  typesAfter
 
 
 
@@ -211,8 +177,8 @@ parseRuntimeType = optionMaybe $ do
         putState def
         _ <- parseStackEffect
         newState <- getState
-        let from' = newState ^. currentEffect.from
-            to'   = newState ^. currentEffect.to
+        let from' = newState ^. currentEffect.before
+            to'   = newState ^. currentEffect.after
         putState oldState
         return $ _KnownR # StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM RuntimeSpecification
   let unknownEffect = do
@@ -243,7 +209,7 @@ getEffect t = do
              let (Right st) = runStackEffectParser t defParseStackEffectsConfig
                  eff = st ^. currentEffect
 
-                 (from'', to'') = (^.from) &&& (^.to) $ eff :: ([[[IndexedStackType]]], [[[IndexedStackType]]])
+                 (from'', to'') = (^.before) &&& (^.after) $ eff :: ([[[IndexedStackType]]], [[[IndexedStackType]]])
                  (from', to') = head $ TF.StackEffectParser.allEffects $ (from'', to'') :: ([IndexedStackType], [IndexedStackType])
              return $ StackEffect  from' (eff ^. streamArguments._head) to'
 
@@ -256,9 +222,9 @@ testEffect t = do
     Left err -> print err
     Right st -> 
       forM_ (st^.currentEffect : st^.previousEffects) $ \x -> do
-      print $ x^.from
+      print $ x^.before
       print $ x^.streamArguments
-      print $ x^.to
+      print $ x^.after
       print $ st^.forced'
 
 
@@ -310,7 +276,7 @@ parseAssertion'' = void $ do
 
   traceM $ "Length: " ++ show (length results)
 
-  let assertions = for results $ \t -> def & from .~ [[]] & to .~ [t] & streamArguments .~ [[]]
+  let assertions = for results $ \t -> def & before .~ [[]] & after .~ [t] & streamArguments .~ [[]]
 
   modifyState $ currentEffect .~ head assertions
   modifyState $ previousEffects .~ tail assertions
@@ -328,9 +294,9 @@ parseFieldType' = void $ do
 
   singleTypes' <- singleTypes
   fieldType <- choice singleTypes'
-  modifyState $ currentEffect.from .~ [[]]
+  modifyState $ currentEffect.before .~ [[]]
   modifyState $ currentEffect.streamArguments .~ [[]]
-  modifyState $ currentEffect.to .~ [[[fieldType]]]
+  modifyState $ currentEffect.after .~ [[[fieldType]]]
   atLeastOneSpace
   string ")"
                            
@@ -365,7 +331,7 @@ parseEffectTemplate t conf p = do
          allEffectsCombos :: [([IndexedStackType], [IndexedStackType])]
          allEffectsCombos = concat $
                 for allEffects $
-                (^.from) &&& (^.to) >>> TF.StackEffectParser.allEffects
+                (^.before) &&& (^.after) >>> TF.StackEffectParser.allEffects
 
 parseEffect :: String -> ParseStackEffectsConfig -> Script' ParseEffectResult
 parseEffect t conf = parseEffectTemplate t conf parseStackEffects

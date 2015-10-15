@@ -1,10 +1,6 @@
 {-# LANGUAGE CPP#-}
 module TF.Paths (getStaticDir) where
 
-import Control.Monad
-import System.FilePath
-
-import qualified Paths_TypedForth (getDataDir)
 
 #if CABAL
 -- using cabal
