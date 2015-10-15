@@ -52,7 +52,7 @@ parseNode :: CheckerM Node
 parseNode = parseNodeWithout []
 
 parseNodeWithout :: [Word] -> CheckerM Node
-parseNodeWithout ws = do
+parseNodeWithout ws = withTrace $ do
   node <- withEmpty $ liftM (new _Expr) expression </> liftM (new _ForthWord) (evalForthWordWithout ws)
 
   applyTypeChecking node

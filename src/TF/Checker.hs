@@ -38,10 +38,10 @@ zipzap effects = for effects $ \((oldComp,oldExec),(newComp,newExec)) -> ((oldCo
 removeWildcards :: [(StackEffectPair, CompExecEffect)] -> CheckerM [(CompExecEffect, CompExecEffect)]
 removeWildcards effs = do
   ( result, stateChanges) <- unzip <$> ( ( mapM ((uncurry oldWildcardDegreeIsGreater
-                                                                          >=> uncurry newWildcardDegreeIsGreater
-                                                                          >=> uncurry oldTopTypeNotWildcard
-                                                                          >=> uncurry newTopTypeNotWildcard
-                                                                          >=> uncurry sameDegree)                                                  >>> runWriterT) (zipzap effs) ) :: CheckerM [((StackEffects, StackEffects), [ChangeState])])
+                                                  >=> uncurry newWildcardDegreeIsGreater
+                                                  >=> uncurry oldTopTypeNotWildcard
+                                                  >=> uncurry newTopTypeNotWildcard
+                                                  >=> uncurry sameDegree)                                                  >>> runWriterT) (zipzap effs) ) :: CheckerM [((StackEffects, StackEffects), [ChangeState])])
   let stateChanges' = filter (not . null) stateChanges
   when (not (null stateChanges') && length (group stateChanges') /= 1) $ do
          lift $ blocked $ mapM_ (iopC . show) stateChanges'
@@ -193,11 +193,13 @@ checkEffects (ForthEffect (stE2s, IntersectionType newCompileI newExecI)) = do
   when (compileEffectError || execEffectError) $ do
     iop $ "compileEffectError: " <> show compileEffectError
     iop $ "execEffectERror: " <> show execEffectError
+    iop $ "execEffectClash: " <> show execEffectClash
     iop $ "oldCompileI: " <> show oldCompileI
     iop $ "newCompileI: " <> show newCompileI
     iop $ "oldExecI: " <> show oldExecI
     iop $ "newExecI: " <> show newExecI
     message <- errorInfo
+    iop $ "message: " <> show message
     throwing (_TypeClashM._MultiEffs) message
 
   validEffects <- fmap (toListOf (traverse._Right) . filter isRight) . mapM runExceptT $ resultingEffects'

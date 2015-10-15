@@ -1,7 +1,13 @@
 flags: {}
 packages:
 - '.'
+- '../present-2.2'
+- '../atto-lisp-0.2.2'
+- '../rosezipper-0.2'
 extra-deps:
 - hspec-expectations-lens-0.4.0
 - total-1.0.4
+- present-2.2
+- rosezipper-0.2
+- atto-lisp-0.2.2
 resolver: lts-3.2

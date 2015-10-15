@@ -5,6 +5,7 @@
 
 module TF.Main where
 
+-- import Present hiding (Char)
 import           Control.Lens
 import           TF.CallChecker               (runChecker')
 import TF.Errors

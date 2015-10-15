@@ -22,10 +22,13 @@ import           Data.Monoid ((<>))
 import           TF.SubtypeUtil
 import           TF.Types hiding (state)
 import  TF.Util
+import Control.Arrow (first)
 import           Data.Maybe
 import           Text.Parsec hiding (runParser, anyToken)
 import qualified TF.Printer as P
 import TF.Errors
+
+import TF.Parsers.ParserUtils (withTrace,withTrace')
 
 
 
@@ -33,7 +36,7 @@ evalToken :: Token -> CheckerM (ForthWord, SemState)
 evalToken = _case & on _Word evalKnownWord & on _Unknown evalUnknown
 
   
-evalForthWord                   = evalForthWordWithout []
+-- evalForthWord                   = evalForthWordWithout []
 
 -- |Parses a Token - when it's a unknown check if there is a definition. If the definition is immediate, we are in compile-mode and it contains postpones we need to prepend the body of the definition to the current stream
 evalForthWordWithout       :: [Word]     -> CheckerM ForthWord
@@ -44,6 +47,7 @@ evalForthWordWithout ws         = do
             modifyState (set stateVar st)
             return w
 
+            
 -- | Determines the semantics of the word, according to the state and determines whether its gets compiled or executed. The word can change the state variable.
 evalKnownWord                                       :: Word -> CheckerM  (ForthWord, SemState)
 evalKnownWord w' = do 
@@ -222,7 +226,6 @@ evalUnknown :: Unknown -> CheckerM (ForthWord, SemState)
 evalUnknown uk =  do
   s <- getState
   fmap fromJust . runMaybeT $ msum [evalDefinedWord uk, evalCreatedWord uk, return (evalNonDefinition uk, view stateVar s)]
-  -- fmap fromJust . runMaybeT $ msum [evalDefinedWord uk, evalCreatedWord uk]
 
 handleHOTstreamArgument :: DefiningOrNot -> Token -> CheckerM DefiningOrNot
 handleHOTstreamArgument arg@(Right (StreamArg _ _ _ (Just (UnknownR index)))) possWord = do 

@@ -2,10 +2,12 @@
 
 module TF.Parsers.ParserUtils where
 
-import Prelude hiding (Word)
+import Prelude hiding (Word, last)
 
-import Control.Lens hiding (noneOf,(??))
+import Control.Lens hiding (noneOf,(??), children)
 import           Control.Error as E
+import Data.Maybe (fromJust)
+import qualified TF.Printer as P
 import Data.Monoid
 import Control.Monad.Except
 import           Control.Monad.Error.Lens
@@ -16,6 +18,31 @@ import  TF.Util
 import qualified Data.Text as Te
 import           Text.Parsec hiding (runParser, anyToken)
 import TF.Errors
+
+import Data.Tree
+import Data.Tree.Zipper hiding (after,before,first)
+import  Text.PrettyPrint (render)
+import Control.Arrow (first)
+
+munzip mab = (liftM fst mab, liftM snd mab)
+mzip (ma,mb) = do
+  a <- ma
+  b <- mb
+  return (a,b)
+
+withTrace' p = mzip . (first withTrace) . munzip $ p
+
+withTrace p = do
+  let modState f = modifyState $ trace._Wrapped %~ f
+  modState $insert (Node "" []) . last . children
+  result <- p
+  modState $ modifyTree (\t -> t { rootLabel = render $ P.infoForthWordOrExpr result })
+  modState $ \s ->
+    if isContained s then
+      fromJust $ parent s
+    else
+      s
+  return result
 
 parseKeyword :: String -> ExpressionsM ()
 parseKeyword keyword = do
@@ -72,13 +99,13 @@ manyWordsTill bs  = manyWordsTillWithout bs []
 
 errorHandler handlingFunction colonName = [
                      handler _ClashInWord handlingFunction,
-                     handler _Clash handlingFunction,
                      handler _BeginUntilNoFlag (handlingFunction . (("The body of begin until must produce a flag value!\n") ++)),
                      handler (_TypeClashM._IfElseExprNotStatic) (handlingFunction . ((colonName <> ": If-Else branches do not have the same type\n") ++) . uncurry (++)),
                      handler_ (_TypeClashM._IfExprNotStatic) (handlingFunction (colonName <> ": An if branch which has an unempty stack effect is not allowed when multiple effects are forbidden")),
-                     handler_ _MultiEffs (handlingFunction "uuu"),
+                     handler_ _MultiEffs (handlingFunction colonName),
                      handler_ _MultiEffClash (handlingFunction "asdf"),
                      handler_ _CastsNotAllowed (handlingFunction (colonName <> ": Casts are not allowed")),
+                     handler _Clash handlingFunction,
                      handler _UnknownWord handlingFunction
                     ]
 

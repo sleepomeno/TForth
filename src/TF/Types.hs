@@ -25,6 +25,9 @@ import qualified Data.Text as Te
 import TF.ForthTypes
 import TF.Errors
 
+  
+import qualified Data.Tree.Zipper as TreeZ
+
 type Identifier = Int
 type ClassName = String
 
@@ -390,6 +393,10 @@ data ColonDefinition = ColonDefinition {
                      , _cdefIsImmediate :: Bool
                      } deriving (Show, Read, Eq, Data, Typeable)
 
+newtype Trace = Trace {
+  _traceParsedExpressions :: TreeZ.TreePos TreeZ.Full String
+} deriving (Show,Read,Eq,Data,Typeable)
+
 data ParseState = ParseState {
                    _definedWords'        :: M.Map String Definition'
                  , _coreWords           :: M.Map Parsable Word
@@ -402,7 +409,7 @@ data ParseState = ParseState {
                  , _subtypeRelation :: S.Set (BasicType, BasicType)
                  , _unresolvedArgsTypes :: M.Map Identifier StackEffect
                  , _inputStreamAssertions :: [StackEffect]
-
+                 , _trace :: Trace
                } deriving (Show, Read, Data, Typeable, Eq)
 makeLenses ''ParseState
 
@@ -489,6 +496,8 @@ data CustomState = CustomState {
 
 
 
+makeFields ''Trace
+makeWrapped ''Trace
 makeFields ''Info
 makeFields ''ParseStackEffectsConfig
 makeFields ''CustomState
@@ -554,12 +563,16 @@ emptyEffect = [StackEffect [] [] []]
   
         
 type Script'  = RWST ParseConfig () CustomState (ExceptT Error' (Writer Info)) 
+
 type StackEffectM = Script'  
 type StackEffects = (StackEffect, StackEffect)
+
 type CheckerM = ParsecT [Token] ParseState StackEffectM 
+
 type CheckNodesT = ([Node] -> CheckerM ForthEffect)
 type CheckEffectsT = ForthEffect -> ReaderT CheckEffectsConfig CheckerM ()
 type CollectEffectsT = Node -> CheckerM ()
+
 type CheckerM' = ReaderT (CheckNodesT, CheckEffectsT, CollectEffectsT) CheckerM
 type StackRuleM = ExceptT SemState (ReaderT CheckEffectsConfig CheckerM)
 
@@ -592,6 +605,44 @@ makeFields ''WildcardResult
 unStackEffectM :: MaybeT (ExceptT String IO) a -> IO (Either String (Maybe a))
 unStackEffectM = runExceptT . runMaybeT
 
+data ParseStackState = ParseStackState { 
+                               pssBefore :: [[[IndexedStackType]]]
+                             , pssAfter :: [[[IndexedStackType]]]
+                             -- , _definedWords :: [Definition]
+                             , pssStreamArguments :: [[DefiningOrNot]]
+                             , pssForced :: Bool
+                             }  deriving (Show, Eq, Read, Data, Typeable)
+makeFields ''ParseStackState
+
+
+data ParseStacksState = ParseStacksState {
+                                psssTypes :: [PrimType]
+                              , psssCurrentEffect :: ParseStackState
+                              , psssPreviousEffects :: [ParseStackState]
+                              , psssForced' :: Bool
+                              , psssIsIntersect :: Bool
+                              } deriving (Show, Eq, Read, Data, Typeable)
+makeFields ''ParseStacksState
+
+type ParseStackEffectsM = ParsecT String ParseStacksState (Reader ParseStackEffectsConfig)
+
+instance HasDefault ParseStacksState where
+  def = ParseStacksState {}
+                & previousEffects .~ []
+                & currentEffect .~ def
+                & forced' .~ False
+                & types .~ forthTypes
+                & isIntersect .~ False
+
+
+instance HasDefault ParseStackState where
+  def = ParseStackState {}
+                -- & types .~ forthTypes
+                & streamArguments .~ []
+                & before .~ []
+                -- & TF.StackEffectParser.definedWords .~ []
+                & after .~ []
+                & forced .~ False
 
 class HasDefault d where
   def :: d

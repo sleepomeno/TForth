@@ -3,7 +3,7 @@ module TF.CallChecker where
 import Control.Arrow 
 import           Control.Error as E
 import           Control.Lens hiding (noneOf,(??))
-import Lens.Family.Total hiding ((&))
+import Lens.Family.Total hiding ((&), Empty)
 import           Control.Monad
 import           Control.Monad.Writer
 import  Text.PrettyPrint (render,vcat, text, ($+$), nest)
@@ -23,6 +23,8 @@ import System.IO
 import System.FilePath
 
 import TF.Paths
+import Data.Tree.Zipper hiding (first,before,after)
+import Data.Tree
 
 checkFile :: ParseConfig -> FilePath -> IO ()
 checkFile conf file = do
@@ -62,7 +64,8 @@ runChecker' conf s = do
      -- showInfo :: Info -> IO ()
 
 defParseState :: ParseState
-defParseState = ParseState M.empty M.empty INTERPRETSTATE False emptyForthEffect (M.fromList [("object", [])]) (M.fromList [("object", [])]) S.empty M.empty []
+defParseState = ParseState M.empty M.empty INTERPRETSTATE False emptyForthEffect (M.fromList [("object", [])]) (M.fromList [("object", [])]) S.empty M.empty [] (Trace (fromTree $ Node "" []))
+
 
          
 runChecker :: ParseConfig -> String -> IO ()
@@ -78,6 +81,7 @@ runChecker config s = do
      showResult (_, parseState) = do
        let checkerState = showCheckerState parseState
            effs = showEffects' . view (effects._Wrapped._1) $ parseState
+       putStrLn . drawTree . toTree . view (trace._Wrapped) $ parseState
        putStrLn checkerState
        putStrLn effs
      showInfo :: Info -> IO ()
