@@ -279,7 +279,6 @@ data Semantics = Semantics {
                       } deriving (Show, Read, Eq, Data, Typeable)
 
 type NameOfDefinition = String  
-type Node = Either ForthWord Expr
 type Variable = String
 type Method = String
 type OOFieldSem = OOFieldSem' StackEffect
@@ -287,27 +286,38 @@ type OOFieldSem = OOFieldSem' StackEffect
 type Number = ()
 type Parsable = Either Te.Text Number -- Str String | Number deriving (Show, Read, Eq, Data, Typeable)
 
-type ColonDefinition' = (ColonDefinition, EffectsByPhase)
-type Definition' = Either ColonDefinition' [StackEffect]
+-- type ColonDefinitionProcessed = (ColonDefinition, EffectsByPhase)
+data ColonDefinitionProcessed = ColonDefinitionProcessed {
+    _cdefprocColonDefinition :: ColonDefinition
+  , _cdefprocProcessedEffects :: EffectsByPhase } deriving Show
+
+data Definition = ColDef ColonDefinitionProcessed | CreateDef [StackEffect] deriving Show
 
 type CompExecEffect = (StackEffect, StackEffect)
 type StackEffectPair = (StackEffect, StackEffect)
-type ForthWordOrExpr = Either ForthWord Expr
-_ForthWord = _Left
-_Expr = _Right
 
-newtype ForthEffect = ForthEffect ([StackEffectPair], IntersectionType) deriving (Show, Read, Eq, Data, Typeable)
+data Node = ForthWord ForthWord | Expr Expr deriving Show
+
+-- _ForthWord = _Left
+-- _Expr = _Right
+
+newtype ForthEffect = ForthEffect ([StackEffectPair], Intersections) deriving (Show, Read, Eq, Data, Typeable)
   
-data IntersectionType = IntersectionType {
+data Intersections = Intersections {
     _intersectCompileEffect :: Bool
   , _intersectExecEffect :: Bool
   } deriving (Show,Read,Eq,Data,Typeable)
 
+data FullStackEffect = FullStackEffect {
+    _fullstackeffectEffects :: MultiStackEffect
+  , _fullstackeffectIntersection :: Intersections
+       } deriving (Show, Read, Eq, Data, Typeable)
+
 data CheckEffectsConfig = CheckEffectsConfig {
-  _checkconfigForthWordOrExpr :: Maybe ForthWordOrExpr
+  _checkconfigForthWordOrExpr :: Maybe Node
 , _checkconfigIsForcedAssertion :: Bool
 , _checkconfigCheckState :: SemState
-}  deriving (Show,Read,Eq,Data,Typeable)
+}  deriving (Show)
 
 defCheckEffectsConfig = CheckEffectsConfig Nothing False INTERPRETSTATE
 
@@ -317,7 +327,7 @@ data ControlStructure = IfExpr [Node]
                       | DoPlusLoop [Node]
                       | BeginUntil [Node]
                       | BeginWhileRepeat [Node] [Node]
-          deriving (Show, Read, Data, Typeable, Eq)
+          deriving (Show)
 
 data OOPExpr = Class ClassName [(Variable, OOFieldSem)] [(Method, OOMethodSem)] ClassName
           | SuperClassMethodCall ClassName Method
@@ -326,7 +336,7 @@ data OOPExpr = Class ClassName [(Variable, OOFieldSem)] [(Method, OOMethodSem)] 
           | FieldCall (CompiledOrExecuted Variable)
           | NoName (Maybe ([StackEffect], Bool)) [Node] ClassName Method
           | NoNameClash (Maybe ([StackEffect], Bool)) ClassName Method
-          deriving (Show, Read, Data, Typeable, Eq)
+          deriving (Show)
 
 data Expr =  ColonExpr String (Maybe (Semantics, Bool)) [Node]
           | ColonExprImmediate String (Maybe (Semantics, Bool)) [Node]
@@ -344,7 +354,7 @@ data Expr =  ColonExpr String (Maybe (Semantics, Bool)) [Node]
           | Require String
           | ControlExpr ControlStructure
           | OOPExpr OOPExpr
-          deriving (Show, Read, Data, Typeable, Eq)
+          deriving (Show)
 
 data Word = Word {
               _wordParsed :: Parsable
@@ -354,7 +364,7 @@ data Word = Word {
             , _wordCompilation :: CompilationSemantics
             , _wordInterpretation :: InterpretationSemantics
             , _wordIsImmediate :: Bool
-            , _wordIntersectionType :: IntersectionType
+            , _wordIntersections :: Intersections
               } deriving (Show, Read, Eq, Data, Typeable)
 
 newtype Unknown = Unknown {
@@ -366,7 +376,7 @@ data ParsedWord = ParsedWord {
                  , _pwordName :: String
                  , _pwordStacksEffects :: CompiledExecutedOrBoth MultiStackEffect
                  , _pwordEnter :: Maybe SemState
-                 , _pwordIntersectionType :: IntersectionType
+                 , _pwordIntersections :: Intersections
                   } deriving (Show, Read, Eq, Data, Typeable)
 
 data ForthWord = UnknownE Unknown
@@ -382,23 +392,37 @@ data OOMethodSem = Empty
                  | ByDefinition ([StackEffect], Bool)
                  | InferredByMethod ([StackEffect], Bool)
                  deriving (Show, Read, Data, Typeable, Eq)
-data EffectsByPhase = Forced [StackEffect]
-                    | Checked ([StackEffect],Bool)
+
+newtype Intersection = Intersection Bool deriving (Show)
+
+data StackEffectsWI = StackEffectsWI {
+    stefwiMultiEffects :: [StackEffect]
+  , stefwiIntersection :: Intersection } deriving (Show)
+                          
+-- data EffectsByPhase = Forced [StackEffect]
+data EffectsByPhase = Forced StackEffectsWI
+                    -- | Checked ([StackEffect],Bool)
+                    | Checked StackEffectsWI -- ([StackEffect],Bool)
                     | NotChecked
-                    | Failed String  deriving (Show, Read, Data, Typeable, Eq)
+                    | Failed String  deriving (Show)
 
 data ColonDefinition = ColonDefinition {
-                       _cdefName        :: String
-                     , _cdefBody        :: [ForthWordOrExpr]
-                     , _cdefIsImmediate :: Bool
-                     } deriving (Show, Read, Eq, Data, Typeable)
+                       _cdefBody        :: [Node]
+                     , _cdefMeta :: ColonDefinitionMeta
+                     } deriving (Show)
+
+data ColonDefinitionMeta = ColonDefinitionMeta {
+    _cdefinfoName :: String
+  , _cdefinfoIsImmediate :: Bool
+    } deriving (Show, Read, Eq)
+makeFields ''ColonDefinitionMeta
 
 newtype Trace = Trace {
   _traceParsedExpressions :: TreeZ.TreePos TreeZ.Full String
 } deriving (Show,Read,Eq,Data,Typeable)
 
 data ParseState = ParseState {
-                   _definedWords'        :: M.Map String Definition'
+                   _definedWords'        :: M.Map String Definition
                  , _coreWords           :: M.Map Parsable Word
                  , _stateVar            :: SemState
                  , _currentCompiling :: Bool
@@ -410,7 +434,7 @@ data ParseState = ParseState {
                  , _unresolvedArgsTypes :: M.Map Identifier StackEffect
                  , _inputStreamAssertions :: [StackEffect]
                  , _trace :: Trace
-               } deriving (Show, Read, Data, Typeable, Eq)
+               } deriving (Show)
 makeLenses ''ParseState
 
 data BuildState = BS { _state :: SemanticsState
@@ -478,11 +502,11 @@ data AssertFailure = AssertFailure {
   
 type Depth = Int
 data Info = Info {
-  _infoCheckedExpressions :: [(ForthWordOrExpr, Depth)]
+  _infoCheckedExpressions :: [(Node, Depth)]
   , _infoFailures :: [CheckFailure]
   , _infoAssertFailures :: [AssertFailure]
 
-  } deriving (Show,Read,Eq,Data,Typeable)
+  } deriving (Show)
 
 instance Monoid Info where
   mempty = Info [] [] []
@@ -504,15 +528,17 @@ makeFields ''CustomState
 makeFields ''ColonDefinition
 makeFields ''ParseConfig
 makeFields ''CheckEffectsConfig
-makeFields ''IntersectionType
+makeFields ''Intersections
+makeFields ''ColonDefinitionProcessed
 makeWrapped ''ForthEffect
 makeLenses ''BuildState
 makeFields ''ParseEffectResult
 makeFields ''ParseState
 makePrisms ''EffectsByPhase
+makeFields ''StackEffectsWI
 makePrisms ''OOMethodSem
 makePrisms ''OOFieldSem'
-makePrisms ''ForthWord
+makePrisms ''Node
 makeFields ''ParsedWord
 makeWrapped ''Unknown
 makeFields ''Unknown
@@ -520,7 +546,9 @@ makeFields ''Word
 makePrisms ''Expr
 makeFields ''Semantics
 makePrisms ''Optional
+makePrisms ''ForthWord
 makePrisms ''CompilationSemantics
+makePrisms ''Definition
 makePrisms ''InterpretationSemantics
 makeWrapped ''ExecutionSemantics
 makeWrapped ''RuntimeSemantics
@@ -544,14 +572,14 @@ type Token = Either Unknown Word
 _Unknown = _Left
 
 
-isImmediateColonDefinition = view isImmediate 
+isImmediateColonDefinition = view $ meta.isImmediate 
 
                       
 _TypeCheckPending = _Left
 _TypeCheckDone    = _Right
 
-_ColonDefinition = _Left
-_CreateDefinition = _Right
+_ColonDefinition = _ColDef
+_CreateDefinition = _CreateDef
 
 
 emptyEffect = [StackEffect [] [] []]
@@ -666,7 +694,7 @@ instance HasDefault (RuntimeSemantics ) where
   def = RunSem def
 
 instance HasDefault Word where
-  def = Word (Left "") def def def def def def (IntersectionType False False)
+  def = Word (Left "") def def def def def def (Intersections False False)
 
 instance HasDefault Semantics where
   def = Semantics def def def

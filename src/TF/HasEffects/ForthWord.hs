@@ -15,7 +15,7 @@ instance HasStackEffects ForthWord where
     let compExecEffect :: [StackEffectPair]
         compExecEffect = pw ^. stacksEffects.to fromThree'
     -- return $ zipWith3 StackEffect (beforeArgs dataStack pw) (repeat (streamArgsOfParsedWord pw)) (afterArgs dataStack pw)
-    return $ withIntersect (pw ^. intersectionType) compExecEffect
+    return $ withIntersect (pw ^. intersections) compExecEffect
 
 
   getStackEffects (DefE x) = do

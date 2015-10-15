@@ -86,19 +86,19 @@ isKnownWord :: CheckerM (Maybe (Either ForthWord DefOrWord) )
 isKnownWord              = do
   possWord <- anyToken
   s        <- getState
-  let maybeColonDefinition' :: Unknown -> Maybe ColonDefinition'
+  let maybeColonDefinition' :: Unknown -> Maybe ColonDefinitionProcessed
       maybeColonDefinition' w'   = preview (definedWords'.at (w' ^. name)._Just._ColonDefinition) s
   maybeDefOrWord <- possWord & (_case & on _Unknown (\uk -> do 
     iopP $ uk ^. name
 
     runMaybeT $ do
       y <- hoistMaybe $ maybeColonDefinition' uk
-      let immediate = y ^. _1.isImmediate
+      let immediate = y ^. colonDefinition.meta.isImmediate
       if immediate then do
-        forthWord <- lift $ evalColonDefinition  (y & _1.isImmediate .~ False)
+        forthWord <- lift $ evalColonDefinition  (y & colonDefinition.meta.isImmediate .~ False)
         return $ Left forthWord
       else 
-        return $ Right . new _Def $ y ^. _1.name)
+        return $ Right . new _Def $ y ^. colonDefinition.meta.name)
 
     & on _Word (\word ->
       if word ^. isImmediate then do 

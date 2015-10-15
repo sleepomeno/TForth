@@ -39,25 +39,25 @@ checkFile conf file = do
   hClose handle  
   
 
-runChecker' :: ParseConfig -> String -> (Either Error' ([ForthWordOrExpr], ParseState), Info)
+runChecker' :: ParseConfig -> String -> (Either Error' ([Node], ParseState), Info)
 -- runLoggingT (\loc logsource level logText -> putStrLn logText) . 
 runChecker' conf s = do 
 
-     let a :: StackEffectM (Either ParseError ([ForthWordOrExpr], ParseState))
+     let a :: StackEffectM (Either ParseError ([Node], ParseState))
          a = runProgramParser s
 
-     let b :: StackEffectM (Either Error' ([ForthWordOrExpr], ParseState))
+     let b :: StackEffectM (Either Error' ([Node], ParseState))
          b = liftM (E.fmapL (review (_ErrorP._ParseErr') . show)) a
-         c :: StackEffectM ([ForthWordOrExpr], ParseState)
+         c :: StackEffectM ([Node], ParseState)
          c = lift . hoistEither =<< b
-         -- d :: Script' (([ForthWordOrExpr], ParseState), ())
+         -- d :: Script' (([Node], ParseState), ())
          d = evalRWST c conf (CustomState 0 0 M.empty)
-         e :: (Either Error' ([ForthWordOrExpr], ParseState), Info)
+         e :: (Either Error' ([Node], ParseState), Info)
          -- e = return . runIdentity . runWriterT $ runEitherT $ fmap fst $ flip runReaderT conf $ d
          e = runIdentity . runWriterT $ runExceptT $ fmap fst $ d
      e
   where
-     runProgramParser :: String -> StackEffectM (Either ParseError ([ForthWordOrExpr], ParseState))
+     runProgramParser :: String -> StackEffectM (Either ParseError ([Node], ParseState))
      runProgramParser s = do
        words' <- parseWords s
        runParserT parseProgram (defParseState & subtypeRelation .~ subtypeRelation' primitiveTypes (conf ^. subtypes)) "" words'
@@ -77,7 +77,7 @@ runChecker config s = do
 
            )
    where
-     showResult :: ([ForthWordOrExpr], ParseState) -> IO ()
+     showResult :: ([Node], ParseState) -> IO ()
      showResult (_, parseState) = do
        let checkerState = showCheckerState parseState
            effs = showEffects' . view (effects._Wrapped._1) $ parseState
@@ -86,7 +86,7 @@ runChecker config s = do
        putStrLn effs
      showInfo :: Info -> IO ()
      showInfo (Info fexprs failures asserts) = do
-       let docs = for fexprs $ \(fexpr, depth) -> nest depth (P.infoForthWordOrExpr fexpr)
+       let docs = for fexprs $ \(fexpr, depth) -> nest depth (P.infoNode fexpr)
            info = text "INFO:" $+$ nest 1 (vcat docs)
            failure = text "FAILURES:" $+$ nest 1 (vcat . map P.checkFailure $ failures)
            assert = text "ASSERT FAILURES:" $+$ nest 1 (vcat . map P.assertFailure $ asserts)

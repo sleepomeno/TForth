@@ -88,14 +88,14 @@ parseColon = do
         env <- ask
         maybeImmediate <- lift $ optionMaybe $ flip runReaderT env $ parseWordImmediate
         let isImmediate = isJust maybeImmediate
-            colonDefinition = ColonDefinition w expr isImmediate
+            colonDefinition = ColonDefinition expr (ColonDefinitionMeta w isImmediate)
         return (colonDefinition, expr)
-      createColon (ColonDefinition _ _ isImmediate) = if isImmediate then  ColonExprImmediate else ColonExpr
+      createColon (ColonDefinition _ (ColonDefinitionMeta w isImmediate)) = if isImmediate then  ColonExprImmediate else ColonExpr
 
   let parseBody :: ExpressionsM Expr
       parseBody = do
         (colonDefinition, expr) <- parseColonDefinitionBody 
-        lift $ modifyState (over definedWords' $ M.insert w (review _ColonDefinition (colonDefinition, NotChecked)))
+        lift $ modifyState (over definedWords' $ M.insert w (review _ColonDefinition (ColonDefinitionProcessed colonDefinition NotChecked)))
         -- modifyState (over definedWords $ M.insert w colonDefinition)
         -- modifyState (lastColonDefinition ?~ w)
         lift $ modifyState $ set currentCompiling False
@@ -113,7 +113,7 @@ parseColon = do
   
         env <- ask
         (colonDefinition, expr) <- lift $ local (typeCheck .~ False) $ flip runReaderT env $ parseColonDefinitionBody
-        lift $ modifyState (over definedWords' $ M.insert w (review _ColonDefinition (colonDefinition, Failed reason)))
+        lift $ modifyState (over definedWords' $ M.insert w (review _ColonDefinition (ColonDefinitionProcessed colonDefinition (Failed reason))))
         lift $ modifyState $ set currentCompiling False
         return $ ColonExprClash w stackComment
 

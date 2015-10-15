@@ -1,4 +1,4 @@
-{-# LANGUAGE  LambdaCase  #-}
+{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction, LambdaCase  #-}
 
 module TF.HasEffects.Expressions (getStackEffects) where
 
@@ -51,7 +51,8 @@ instance HasStackEffects Expr where
 
 
     checkNodes <- view _1
-    let go (create, exprs, comma, does) = withEmpty $ do
+    let go :: (Node, [Node], Maybe Node, Maybe [Node]) -> CheckerM ForthEffect
+        go (create, exprs, comma, does) = withEmpty $ do
           checkNodes (create : exprs)
 
           runMaybeT $ do
@@ -68,7 +69,7 @@ instance HasStackEffects Expr where
                         Nothing -> return result
                         Just doesEffects -> do
                           -- let newCreating = create & (elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0).runtimeEffect ?~ _RuntimeNotProcessed # (doesEffects & traverse.both %~ (\(StackEffect x y z) -> (x,y,z)))
-                          let newCreating = create & (elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0).runtimeEffect ?~ (doesEffects)
+                          let newCreating = create & elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0.runtimeEffect ?~ doesEffects
                           go (newCreating, exprs, comma, Nothing)
 
 
@@ -109,7 +110,7 @@ instance HasStackEffects Expr where
       return result
 
     where
-       l = if has (_Left._DefE) create then
+       l = if has (_ForthWord._DefE) create then
              _DefE.chosen._2
            else
              _KnownWord.stacksEffects.chosen''._Wrapped
@@ -215,7 +216,7 @@ instance HasStackEffects Expr where
     (effs, compI) <- if isForced then
              return ((stackCommentEffects & view (_Just._1.effectsOfStack._Wrapped)), False)
             else (do
-              (ForthEffect (compExecEffects, IntersectionType compI execI )) <- withEmpty' $ checkNodes bodyWords
+              (ForthEffect (compExecEffects, Intersections compI execI )) <- withEmpty' $ checkNodes bodyWords
 
               let compColonEffects = (compExecEffects ^.. traverse._1)
                   execColonEffects = (compExecEffects ^.. traverse._2)

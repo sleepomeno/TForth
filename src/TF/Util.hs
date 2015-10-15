@@ -17,6 +17,8 @@ import qualified TF.Printer as P
 import qualified Data.Map as M
 
 
+-- fworex = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
+
 showClasses :: ParseState -> String
 showClasses st = 
   let classesToMethods = views classInterfaces M.toList st 
@@ -30,11 +32,11 @@ showDefinitions :: ParseState -> String
 showDefinitions st =
   let showColonDefinition name colonDef = render $ text name $+$ P.nested (P.colonDefinition' colonDef)
       showCreate name effs = render $ text name $+$ P.nested (vcat $ map P.stackEffectNice effs)
-      keysValues = M.toList $ view definedWords' st :: [(String, Definition')]
+      keysValues = M.toList $ view definedWords' st :: [(String, Definition)]
       in
   "DICTIONARY:\n\n" ++ (unlines . map (++ "\n") . map (\(name,y) -> case y of 
-                                      Left x -> showColonDefinition name x
-                                      Right x -> showCreate name x) $ keysValues)
+                                      ColDef x -> showColonDefinition name x
+                                      CreateDef x -> showCreate name x) $ keysValues)
 
 
 showEffs =  mapM (iop . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e))
@@ -73,7 +75,7 @@ blocked x = do
 emptySt :: StackEffect
 emptySt = StackEffect [] [] []
 
-emptyIntersect = IntersectionType False False
+emptyIntersect = Intersections False False
 emptyForthEffect = ForthEffect ([(emptySt, emptySt)], emptyIntersect)
 
 withoutIntersect effs = ForthEffect (effs, emptyIntersect)
@@ -112,7 +114,7 @@ toThree (stE1, stE2)
 new = review
 labeled = flip label
 
-tellExpr :: ForthWordOrExpr -> CheckerM ()
+tellExpr :: Node -> CheckerM ()
 tellExpr expr = do
   d <- use depth
   lift . lift $ tell (Info [(expr, d)] [] [])

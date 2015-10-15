@@ -36,7 +36,7 @@ withTrace p = do
   let modState f = modifyState $ trace._Wrapped %~ f
   modState $insert (Node "" []) . last . children
   result <- p
-  modState $ modifyTree (\t -> t { rootLabel = render $ P.infoForthWordOrExpr result })
+  modState $ modifyTree (\t -> t { rootLabel = render $ P.infoNode result })
   modState $ \s ->
     if isContained s then
       fromJust $ parent s

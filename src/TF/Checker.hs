@@ -27,6 +27,8 @@ import TF.CheckerUtils
 import TF.HasEffects.HasStackEffects
 import TF.HasEffects.Expressions()
 
+fworex = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
+
 checkNodes :: [Node] -> CheckerM ForthEffect
 checkNodes nodes = do
   mapM_ collectEffects nodes
@@ -64,14 +66,14 @@ resolveUnknownType :: Identifier -> DataType -> CheckerM ()
 resolveUnknownType identifier arg = blocked $ do
   iopW "RESOLVE UNKNOWN TYPES OF"
   targets1 <- toListOf (definedWords'.traverse._CreateDefinition.traverse.after.traverse.filtered isUnknownType) <$> getState 
-  targets2 <- toListOf (definedWords'.traverse._ColonDefinition._2._Checked._1.traverse.streamArgs.traverse._Defining.argType._Just) <$> getState 
-  targets3 <- toListOf (definedWords'.traverse._ColonDefinition._2._Checked._1.traverse.after.traverse.filtered isUnknownType) <$> getState 
+  targets2 <- toListOf (definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse.streamArgs.traverse._Defining.argType._Just) <$> getState 
+  targets3 <- toListOf (definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse.after.traverse.filtered isUnknownType) <$> getState 
   iopW . render . vcat . map P.dataType $ targets1 ++ targets2 ++ targets3
   iopW $ "REPLACE WITH: " ++ (render . P.dataType $ (arg, 0))
 
   modifyState $ definedWords'.traverse._CreateDefinition.traverse.after.traverse.filtered isUnknownType._1 %~ setBaseType arg
-  modifyState $ definedWords'.traverse._ColonDefinition._2._Checked._1.traverse.streamArgs.traverse._Defining.filtered hasUnknownArgType.argType %~ over _Just (first $ setBaseType arg)
-  modifyState $ definedWords'.traverse._ColonDefinition._2._Checked._1.traverse.before.traverse.filtered isUnknownType._1 %~ setBaseType arg
+  modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse.streamArgs.traverse._Defining.filtered hasUnknownArgType.argType %~ over _Just (first $ setBaseType arg)
+  modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse.before.traverse.filtered isUnknownType._1 %~ setBaseType arg
   modifyState $ classFields %~ imap (updateFields updateStackEffect)
   where
     isUnknownType = isCorrectCreatedWord identifier
@@ -90,7 +92,7 @@ adjustDegree identifier diff = do
      modifyState $ definedWords'.traverse._CreateDefinition.traverse.after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
   modifyState $ classFields %~ imap (updateFields updateStackEffect)
 
-  -- l4 . modifyState $ definedWords'.traverse._ColonDefinition._2._Checked.traverse.streamArgs.traverse._Defining.filtered hasUnknownArgType.argType %~ over (_Left._Just) ((!! diff) . iterate Reference)
+  -- l4 . modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.traverse.streamArgs.traverse._Defining.filtered hasUnknownArgType.argType %~ over (_Left._Just) ((!! diff) . iterate Reference)
   where
     isUnknownType = isCorrectCreatedWord identifier
     isTarget = isUnknownType
@@ -112,7 +114,7 @@ collectEffects a = do
 
   -- iopC "Next:"
   -- iopC $ render $ P.forthWordOrExpr a
-  stE2s <- (`runReaderT` (checkNodes, checkEffects, collectEffects)) $ either getStackEffects getStackEffects a
+  stE2s <- (`runReaderT` (checkNodes, checkEffects, collectEffects)) $ either getStackEffects getStackEffects $ view fworex a
   let config = defCheckEffectsConfig & forthWordOrExpr .~ Just a & isForcedAssertion .~ has (_Expr._Assert._2.only True) a
   flip runReaderT config $ checkEffects stE2s
   -- iopC $ show stE2s
@@ -120,10 +122,10 @@ collectEffects a = do
   
 
 checkEffects :: ForthEffect -> ReaderT CheckEffectsConfig CheckerM ()
-checkEffects (ForthEffect (stE2s, IntersectionType newCompileI newExecI)) = do
+checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
 
   s <- lift getState
-  let (ForthEffect (realEffs, IntersectionType oldCompileI oldExecI)) = s ^. effects
+  let (ForthEffect (realEffs, Intersections oldCompileI oldExecI)) = s ^. effects
 
   let effs' = zipzap $ liftM2 (,) realEffs stE2s
 
@@ -185,7 +187,7 @@ checkEffects (ForthEffect (stE2s, IntersectionType newCompileI newExecI)) = do
            lift . lift . lift $ tell $ Info [] [] [AssertFailure realEffs stE2s] 
 
         return $ case fwordOrExpr of
-          Just x  -> render $ either P.infoForthWord P.infoExpr x
+          Just x  -> render $ either P.infoForthWord P.infoExpr $ view fworex $ x
           Nothing -> ""
 
 

@@ -72,7 +72,10 @@ compEff :: StackEffect -> CompExecEffect
 compEff s = (s, emptySt)
 
 exportColonDefinition isForced colonName effs' compI = do 
-    let modifier = if isForced then Forced else \x -> Checked (x, compI)
+    let modifier x = if isForced then
+                       Forced $ StackEffectsWI x (Intersection False)
+                     else
+                       Checked $ StackEffectsWI x (Intersection compI) 
     forbidMulti <- views allowMultipleEffects not
     let effs = nub effs'
     checkResult <- if (length effs > 1 && forbidMulti) then do
@@ -91,7 +94,7 @@ exportColonDefinition isForced colonName effs' compI = do
                    else
                      return $ modifier effs
 
-    modifyState $ definedWords'.ix colonName._ColonDefinition._2 .~ checkResult
+    modifyState $ definedWords'.ix colonName._ColonDefinition.processedEffects .~ checkResult
             
 
 changeEffectsOfState :: (StackEffect -> StackEffect) -> CheckerM ()
@@ -193,7 +196,7 @@ flag'' = do
   id <- identifier <<+= 1
   return $ (NoReference $ PrimType FT.flag, Just id)
 
-effectMatches' :: (StackEffect, IntersectionType) -> (StackEffect, IntersectionType) -> CheckerM' Bool
+effectMatches' :: (StackEffect, Intersections) -> (StackEffect, Intersections) -> CheckerM' Bool
 -- effectMatches' (eff1, int1) (eff2, int2)  = handling _TypeClash (const $ return False) $ withEmpty' $ do
 effectMatches' (eff1, int1) (eff2, int2) = handling _TypeClash (const $ return False) $ withEmpty''' $ do
 -- effectMatches' (eff1, int1) (eff2, int2) = withEmpty' $ do

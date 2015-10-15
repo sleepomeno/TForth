@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module TF.Printer where
 
 import Prelude hiding (Word)
@@ -14,11 +15,13 @@ import TF.ForthTypes
 
 nested = nest 1
 
-pprint :: [ForthWordOrExpr] -> Doc
-pprint = vcat . map (either forthWord expr) 
+fworex = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
 
-forthWordOrExpr = either forthWord expr
-infoForthWordOrExpr = either infoForthWord infoExpr
+pprint :: [Node] -> Doc
+pprint = vcat . map (either forthWord expr . view fworex) 
+
+forthWordOrExpr = either forthWord expr . view fworex
+infoNode = either infoForthWord infoExpr . view fworex
 
 
 possibleWord :: Token -> Doc
@@ -236,15 +239,15 @@ dataType (NoReference basicType, index) = case basicType of
   ExecutionType token -> text "ExecutionType" $+$ nested (ppDoc token) 
 
 
-colonDefinition' :: ColonDefinition' -> Doc
-colonDefinition' (c, effsByPhase) = (case effsByPhase of
-                                                  Checked (effs,intersect) -> (text ("Stack effect inferred: (" <> (if intersect then "" else "NOT ") <> " INTERSECT)")) $+$ (nested . vcat . map stackEffect $ effs)
+colonDefinition' :: ColonDefinitionProcessed -> Doc
+colonDefinition' (ColonDefinitionProcessed c effsByPhase) = (case effsByPhase of
+                                                  Checked (StackEffectsWI effs (Intersection intersect)) -> (text ("Stack effect inferred: (" <> (if intersect then "" else "NOT ") <> " INTERSECT)")) $+$ (nested . vcat . map stackEffect $ effs)
                                                   NotChecked -> text "Stack effect not Checked"
-                                                  Forced effs -> text "Stack effect forced" $+$ (nested . vcat . map stackEffectNice $ effs)
+                                                  Forced (StackEffectsWI effs _) -> text "Stack effect forced" $+$ (nested . vcat . map stackEffectNice $ effs)
                                                   Failed s -> text ("FAILURE: " ++ s))
 
 colonDefinition'' :: ColonDefinition -> Doc
-colonDefinition'' (ColonDefinition n _ _) = text ("COLON_DEFINTION " ++ n)
+colonDefinition'' (ColonDefinition _ (ColonDefinitionMeta n _)) = text ("COLON_DEFINTION " ++ n)
 
 
 realtype :: PrimType -> Doc

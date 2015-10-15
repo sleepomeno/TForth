@@ -57,7 +57,7 @@ evalKnownWord w' = do
       compSem              = w'^.compilation                  :: CompilationSemantics
       definedExeSem        = w' ^. execution._Wrapped ^? _Sem :: Maybe Semantics
       runtimeSem           = w' ^. runtime._Wrapped ^? _Sem   :: Maybe Semantics
-      intersect = w' ^. intersectionType
+      intersect = w' ^. intersections
 
   -- when (intersect ^. execEffect) $ undefined
 
@@ -98,7 +98,7 @@ evalKnownWord w' = do
            & name .~ view name w'
            & parsed .~ view parsed w'
            & stacksEffects .~ singleSemantics
-           & intersectionType .~ newIntersect
+           & intersections .~ newIntersect
            & enter .~ view enter (fromJust sem)
 
   let args :: MaybeT (ParsecT [Token] ParseState StackEffectM) [DefiningOrNot]
@@ -125,17 +125,19 @@ evalKnownWord w' = do
 
   
 
-maybeColonDefinition :: Unknown -> ParseState -> Maybe ColonDefinition'
+maybeColonDefinition :: Unknown -> ParseState -> Maybe ColonDefinitionProcessed
 maybeColonDefinition w' s   = preview (definedWords'.at (w' ^. name)._Just._ColonDefinition) s-- & fmap (view _ColonDefinition)
 -- maybeDefinition w' s   = view (definedWords'.at (w' ^. name)) s
 evalNonDefinition  =  UnknownE . Unknown . view name
 
-evalColonDefinition :: ColonDefinition' -> CheckerM ForthWord
-evalColonDefinition (colonDef, effs')  = do
+evalColonDefinition :: ColonDefinitionProcessed -> CheckerM ForthWord
+evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
   s <- getState
+  let (ColonDefinition _ (ColonDefinitionMeta colonName isCdefImmediate)) = colonDef
   let st = view stateVar s
-      executed = st == INTERPRETSTATE || view isImmediate colonDef
-      colonName = colonDef ^. name
+      executed = st == INTERPRETSTATE || isCdefImmediate
+      -- executed = st == INTERPRETSTATE || colonDef ^. meta.isImmediate
+      -- colonName = colonDef ^. name
 
   iopP $ "SHOW COLONNAME " ++ colonName
   iopP $ "IS EXECUTED: " ++ show executed
@@ -146,7 +148,7 @@ evalColonDefinition (colonDef, effs')  = do
     cause <- hoistEither $ matching _Failed effs'
     lift $ throwing _ClashInWord $ "ERROR in '" <> colonName <> "': " <> cause
 
-  let effs = [emptySt] `fromMaybe` ((effs' ^? _Checked._1) `mplus` (effs' ^? _Forced))
+  let effs = [emptySt] `fromMaybe` ((effs' ^? _Checked.multiEffects) `mplus` (effs' ^? _Forced.multiEffects))
 
   stEff <- liftUp $ tryHead (_Impossible # (colonName ++ " has no effects! Empty List!")) effs
 
@@ -174,7 +176,7 @@ evalColonDefinition (colonDef, effs')  = do
 
 
 
-  return $ DefE . compiledOrExecuted . (, effs') . view name $ colonDef
+  return $ DefE . compiledOrExecuted . (, effs') $ colonName
 
 evalCreatedWord :: Unknown -> MaybeT CheckerM (ForthWord, SemState)
 evalCreatedWord uk = do
@@ -201,7 +203,7 @@ evalDefinedWord uk = do
                       
      s <- lift getState
      let state' = view stateVar s
-     cDef@(definition,effects) <- hoistMaybe $ maybeColonDefinition uk s
+     cDef@(ColonDefinitionProcessed definition effects) <- hoistMaybe $ maybeColonDefinition uk s
 
      -- when (isLeft definition') $
      --     lift $ throwing _ErrorT (definition' ^?! _Left)
@@ -211,7 +213,7 @@ evalDefinedWord uk = do
      lift $ when (isImmediateColonDefinition definition) $ do
                input <- getInput
                let defOrWords :: [DefOrWord]
-                   defOrWords = toListOf (body.traverse._Right._Postpone) definition 
+                   defOrWords = toListOf (body.traverse._Expr._Postpone) definition 
                    postpones :: [Token]
                    postpones = defOrWords & map
                                (either (new _Unknown . Unknown)
