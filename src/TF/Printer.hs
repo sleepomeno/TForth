@@ -10,18 +10,17 @@ import           Control.Lens hiding (noneOf)
 import Control.Arrow ((***),(>>>))
 import Data.Monoid
 import Data.Maybe
+import TF.Util (nodeIso)
 
 import TF.ForthTypes
 
 nested = nest 1
 
-fworex = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
-
 pprint :: [Node] -> Doc
-pprint = vcat . map (either forthWord expr . view fworex) 
+pprint = vcat . map (either forthWord expr . view nodeIso) 
 
-forthWordOrExpr = either forthWord expr . view fworex
-infoNode = either infoForthWord infoExpr . view fworex
+forthWordOrExpr = either forthWord expr . view nodeIso
+infoNode = either infoForthWord infoExpr . view nodeIso
 
 
 possibleWord :: Token -> Doc

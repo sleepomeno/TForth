@@ -12,36 +12,10 @@ import TF.Types hiding (isSubtypeOf)
 import           Text.Parsec hiding (anyToken)
 import qualified Data.Text as Te
 import Debug.Trace
-import  Text.PrettyPrint (render,vcat, text, ($+$))
-import qualified TF.Printer as P
 import qualified Data.Map as M
 
 
--- fworex = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
-
-showClasses :: ParseState -> String
-showClasses st = 
-  let classesToMethods = views classInterfaces M.toList st 
-      classesToFields  = views classFields M.toList st
-      in
-   render . vcat $ map (\((clazz, methods),(_,fields)) -> P.showClass clazz "unknown" fields methods) $ filter (\((class1, _), (class2, _)) -> class1 == class2) $ liftM2 (,) classesToMethods classesToFields
-
-showCheckerState :: ParseState -> String
-showCheckerState st = unlines [showDefinitions st, showClasses st]
-showDefinitions :: ParseState -> String
-showDefinitions st =
-  let showColonDefinition name colonDef = render $ text name $+$ P.nested (P.colonDefinition' colonDef)
-      showCreate name effs = render $ text name $+$ P.nested (vcat $ map P.stackEffectNice effs)
-      keysValues = M.toList $ view definedWords' st :: [(String, Definition)]
-      in
-  "DICTIONARY:\n\n" ++ (unlines . map (++ "\n") . map (\(name,y) -> case y of 
-                                      ColDef x -> showColonDefinition name x
-                                      CreateDef x -> showCreate name x) $ keysValues)
-
-
-showEffs =  mapM (iop . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e))
-showEffs' =  mapM (iop . render . P.stackEffect)
-showEff =  iop . render . P.stackEffect
+nodeIso = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
 
 iop = traceM
 iopS = traceShowM

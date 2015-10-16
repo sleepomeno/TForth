@@ -12,6 +12,7 @@ import           Control.Monad.RWS
 import           TF.Parsers.Parser
 import           TF.Parsers.Tokenizer
 import           TF.Util
+import           TF.CheckerUtils (showCheckerState)
 import           TF.Types hiding (word)
 import           Text.Parsec hiding (token)
 import TF.Errors

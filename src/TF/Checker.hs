@@ -27,8 +27,6 @@ import TF.CheckerUtils
 import TF.HasEffects.HasStackEffects
 import TF.HasEffects.Expressions()
 
-fworex = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
-
 checkNodes :: [Node] -> CheckerM ForthEffect
 checkNodes nodes = do
   mapM_ collectEffects nodes
@@ -114,7 +112,7 @@ collectEffects a = do
 
   -- iopC "Next:"
   -- iopC $ render $ P.forthWordOrExpr a
-  stE2s <- (`runReaderT` (checkNodes, checkEffects, collectEffects)) $ either getStackEffects getStackEffects $ view fworex a
+  stE2s <- (`runReaderT` (checkNodes, checkEffects, collectEffects)) $ either getStackEffects getStackEffects $ view nodeIso a
   let config = defCheckEffectsConfig & forthWordOrExpr .~ Just a & isForcedAssertion .~ has (_Expr._Assert._2.only True) a
   flip runReaderT config $ checkEffects stE2s
   -- iopC $ show stE2s
@@ -187,7 +185,7 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
            lift . lift . lift $ tell $ Info [] [] [AssertFailure realEffs stE2s] 
 
         return $ case fwordOrExpr of
-          Just x  -> render $ either P.infoForthWord P.infoExpr $ view fworex $ x
+          Just x  -> render $ either P.infoForthWord P.infoExpr $ view nodeIso $ x
           Nothing -> ""
 
 
