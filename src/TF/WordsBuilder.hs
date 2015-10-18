@@ -14,6 +14,7 @@ import           Control.Monad.Free
 import           TF.StackEffectParser (parseEffect, defParseStackEffectsConfig)
 import qualified Data.Text as Te
 import           TF.Types 
+import TF.HandleDegrees
 
 
 type BuildMonad = ReaderT ParseConfig (StateT BuildState Script')

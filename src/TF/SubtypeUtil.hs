@@ -13,13 +13,14 @@ import qualified Data.Set as S
 import           TF.Util
 import           Text.Parsec              hiding (token)
 import           TF.Types                 hiding (isSubtypeOf, word)
+import TF.HandleDegrees
 
 isSubtypeOf :: DataType -> DataType -> CheckerM Bool
 isSubtypeOf t1 t2 = do
   subtypeRelationSet <- view subtypeRelation <$> getState :: CheckerM (S.Set (BasicType, BasicType))
   if refDegree t1 == refDegree t2 then do
-    let baseType1 = baseType' t1  :: DataType
-        baseType2 = baseType' t2
+    let baseType1 = baseType t1  :: DataType
+        baseType2 = baseType t2
         -- bothNotWildcard = has _NoReference baseType1 && has _NoReference baseType2
         -- subtypeOfWildcard = ((not (has _Wildcard baseType1) && has _Wildcard baseType2)) || ((not (has _WildcardWrapper baseType1) && has _WildcardWrapper baseType2)) || (has _Wildcard baseType1 && has _Wildcard baseType2) || (has _Dynamic baseType1 || has _Dynamic baseType2 || has (_NoReference._PrimType.symbol.only DYN) baseType1 || has (_NoReference._PrimType.symbol.only DYN) baseType2)
         subtypeOfWildcard = ((not (has _Wildcard baseType1) && has _Wildcard baseType2)) || ((not (has _WildcardWrapper baseType1) && has _WildcardWrapper baseType2)) || (has _Wildcard baseType1 && has _Wildcard baseType2) || (has _Dynamic baseType1 || has _Dynamic baseType2 || has (_NoReference._PrimType.symbol.only DYN) baseType1 || has (_NoReference._PrimType.symbol.only DYN) baseType2)

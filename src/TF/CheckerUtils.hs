@@ -18,6 +18,7 @@ import qualified Data.Map                 as M
 import           Text.Parsec              hiding (token)
 import qualified TF.Printer               as P
 import           TF.Types                 hiding (isSubtypeOf, word)
+import TF.HandleDegrees
 import TF.Errors
 import TF.SubtypeUtil 
 
@@ -130,7 +131,7 @@ replaceWrappers result = do
   let wwrappersOfEff :: StackEffect -> [Int]
       wwrappersOfEff eff = toListOf (before.wrapperLens._2._Just) eff ++ toListOf (after.wrapperLens._2._Just) eff
 
-      wrapperLens = traverse.filtered (\(t,_) -> baseType' t == WildcardWrapper)
+      wrapperLens = traverse.filtered (\(t,_) -> baseType t == WildcardWrapper)
   let wrapperIndices = concatMap wwrappersOfEff result
 
   replacements <- forM (nub wrapperIndices) $ \i -> do

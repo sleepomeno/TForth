@@ -56,38 +56,12 @@ data RuntimeSpecification = NoR |
                             UnknownR UniqueArg |
                             KnownR StackEffect |
                             ResolvedR UniqueArg StackEffect deriving (Show,Read,Eq,Data,Typeable, Ord)
+
 data ExecutionToken = ExecutionToken { _executiontokenSymbol :: TypeSymbol
                                      , _executiontokenRuntimeSpecified :: Maybe RuntimeSpecification
                                      } deriving (Show,Ord,Read,Eq,Data,Typeable)
 
 
-refDegree :: DataType -> Int
-refDegree (Reference x) = 1 + refDegree x
-refDegree (NoReference x) = 0
-refDegree (Wildcard) = 0
-refDegree (Dynamic) = 0
-refDegree (WildcardWrapper) = 0
-refDegree (UnknownType _) = 0
-
-baseType :: IndexedStackType -> IndexedStackType
-baseType (arg, i) = (baseType' arg, i)
-
-setBaseType :: DataType -> DataType -> DataType
-setBaseType new (NoReference _) = new
-setBaseType new (Reference old) = Reference $ setBaseType new old
-setBaseType new _ = new 
-
-baseType' :: DataType -> DataType
-baseType' Dynamic = Dynamic
-baseType' Wildcard = Wildcard
-baseType' WildcardWrapper = WildcardWrapper
-baseType' (NoReference r) = NoReference r
-baseType' (Reference d) = baseType' d
-baseType' (UnknownType i) = UnknownType i
-
-removeDegree 0 x = x
-removeDegree x (Reference y) = removeDegree (x-1) y
-removeDegree x y = y
 
 --------------------------------------
 ------- STREAM ARGUMENT TYPES --------  
@@ -103,11 +77,9 @@ data DefiningArg = DefiningArg {
                     , _definingArgType :: Maybe IndexedStackType
                     , _definingEndDelimiter :: Maybe String
 
-                    -- , _defargRuntimeEffect :: Maybe (Either [(StackEffect,StackEffect)] [(StackEffect,StackEffect)])
                     , _definingRuntimeEffect :: Maybe [(StackEffect,StackEffect)]
                       -- the effect specification in comments:
                     , _definingRuntimeSpecified :: Maybe StackEffect 
-                    -- , _defargRuntimeChecked :: Bool
                     }  deriving (Show,Read,Eq,Data,Typeable, Ord)
 
 
@@ -152,52 +124,6 @@ makeFields ''DefiningArg
 makeFields ''StreamArg
 makePrisms ''RuntimeSpecification
 makeFields ''ExecutionToken
-
--- printSubtypes = putStrLn . drawForest $ fmap (fmap (render . P.realtype)) (subtypeForest forthTypes getSubtypes)
-
--------------------------------
-------- > FORTH TYPES ---------  
--------------------------------
-subtypeForest :: [BasicType] -> (BasicType -> [BasicType]) -> Forest BasicType
-subtypeForest forthTypes' getSubTypes' = unfoldForest getSubTypesOf forthTypes'
-   where
-     getSubTypesOf :: BasicType -> (BasicType, [BasicType])
-     getSubTypesOf supertype = (supertype, getSubTypes' supertype)
-
-getSubtypes :: PrimType -> [PrimType]
-getSubtypes (PT U _ _ _) = [plusN, addr]
-getSubtypes (PT ADDR _ _ _)  = [caddr]
-getSubtypes (PT CADDR _ _ _)  = [aaddr]
-getSubtypes (PT Plus_N _ _ _)  = [char]
-getSubtypes (PT N _ _ _)  = [plusN]
-getSubtypes _ = []
-
-subtypeRelation' :: [BasicType] -> (PrimType -> [PrimType]) -> S.Set (BasicType, BasicType)
-subtypeRelation' forthTypes' getSubTypes' = S.fromList [(t1, t2) | t1 <- forthTypes',
-                                            t2 <- forthTypes',
-                                            let forest = subtypeForest forthTypes' (dimap (^?! _PrimType) (map PrimType) getSubTypes'),
-                                            isSubtypeOf t1 t2 forest]
-
-defaultSubtypeRelation :: S.Set (BasicType, BasicType)
-defaultSubtypeRelation = subtypeRelation' primitiveTypes  getSubtypes
-
-primitiveTypes = map PrimType forthTypes
-
-isSubtypeOf :: BasicType -> BasicType -> Forest BasicType -> Bool
-
-isSubtypeOf t1 t2 forest | t1 == t2  = True
-isSubtypeOf t1 t2 forest = any isSubTypeOf' $ forest
-  where
-    isSubTypeOf' tree 
-        | rootLabel tree == t2   = not . null $ concatMap (filter (== t1) . depth') (subForest tree)
-        | rootLabel tree /= t2   = False
--------------------------------
-------- < FORTH TYPES ---------  
--------------------------------
-
-depth' :: Tree a -> [a]
-depth' (Node x []) = [x]
-depth' (Node x ts) = x : concatMap depth' ts
 
 
 type ReferenceDegree = Int

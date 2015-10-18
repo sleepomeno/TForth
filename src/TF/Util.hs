@@ -9,6 +9,7 @@ import Control.Monad.Writer
 import Control.Lens
 import           Control.Error as E
 import TF.Types hiding (isSubtypeOf)
+import TF.HandleDegrees
 import           Text.Parsec hiding (anyToken)
 import qualified Data.Text as Te
 import Debug.Trace
@@ -97,7 +98,7 @@ tellExpr expr = do
 resolveRuntimeType :: [(UniqueArg, StackEffect)] -> IndexedStackType -> IndexedStackType
 resolveRuntimeType resolvedRuntimes (t, i') = (setBaseType newType t, i')
   where
-    newType = case baseType' t of
+    newType = case baseType t of
       NoReference t' -> NoReference $ (case t' of
         exec@(ExecutionType execToken) -> ExecutionType $ execToken & runtimeSpecified._Just %~ (\case
           UnknownR i -> (case (lookup i resolvedRuntimes) of

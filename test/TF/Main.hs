@@ -12,6 +12,7 @@ import TF.Errors
 import        qualified   TF.ForthTypes as FT 
 import         TF.ForthTypes (symbol, TypeSymbol(N, U, Char))
 import           TF.Types                     as Types
+import TF.Subtypes
 import           TF.WordsBuilder (parsing, effect)
 
 import Data.List (isInfixOf)
@@ -541,7 +542,7 @@ immediate = do
       effects1 `shouldBe` effects2
 
 subtyping = do
-  let check = fst . runChecker' (defTestConfig & subtypes .~ getSubtypes)
+  let check = fst . runChecker' (defTestConfig & subtypes .~ getDefaultSubtypes)
   it "top level" $
     check "4 bl +" `shouldHave` _Right
   it "as a reference is a subtype of another if the referenced value is a subtype of the other referenced value" $

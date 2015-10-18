@@ -14,6 +14,7 @@ import           TF.Parsers.Tokenizer
 import           TF.Util
 import           TF.CheckerUtils (showCheckerState)
 import           TF.Types hiding (word)
+import TF.Subtypes
 import           Text.Parsec hiding (token)
 import TF.Errors
 import qualified TF.Printer as P
@@ -22,6 +23,8 @@ import qualified Data.Set as S
 
 import System.IO
 import System.FilePath
+
+
 
 import TF.Paths
 import Data.Tree.Zipper hiding (first,before,after)

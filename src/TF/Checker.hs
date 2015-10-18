@@ -21,6 +21,7 @@ import           TF.Util
 import           Text.Parsec              hiding (token)
 import qualified TF.Printer               as P
 import           TF.Types                 hiding (isSubtypeOf, word)
+import TF.HandleDegrees
 import TF.Errors
 
 import TF.CheckerUtils
@@ -75,7 +76,7 @@ resolveUnknownType identifier arg = blocked $ do
   modifyState $ classFields %~ imap (updateFields updateStackEffect)
   where
     isUnknownType = isCorrectCreatedWord identifier
-    hasUnknownArgType x = has (argType._Just) x && has _UnknownType (baseType' (x ^?! argType._Just._1))
+    hasUnknownArgType x = has (argType._Just) x && has _UnknownType (baseType (x ^?! argType._Just._1))
     updateStackEffect :: StackEffect -> StackEffect
     updateStackEffect stEff = stEff & after.traverse.filtered isUnknownType._1 %~ setBaseType arg
 
@@ -96,7 +97,7 @@ adjustDegree identifier diff = do
     isTarget = isUnknownType
     updateStackEffect stEff = stEff & after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
 
-isCorrectCreatedWord identifier (w, _)  = has _UnknownType (baseType' w)  && ((baseType' w ^?! _UnknownType) == identifier)
+isCorrectCreatedWord identifier (w, _)  = has _UnknownType (baseType w)  && ((baseType w ^?! _UnknownType) == identifier)
 
 applyWildcardRenaming' effs = do
   (result, _) <- unzip <$> mapM (uncurry renameWildcards >>> runWriterT) (zipzap effs)
@@ -266,7 +267,7 @@ handleArgs (Left arg) = do
         defaultRuntimeType = StackEffect [] [] [first Reference defaultR]
         defaultR = case currentType of
           Nothing -> (UnknownType uniqueId, Just uniqueId2)
-          Just (t, i) -> if baseType' t == Wildcard then
+          Just (t, i) -> if baseType t == Wildcard then
                            (setBaseType (UnknownType uniqueId) t, Just uniqueId2)
                          else
                            (t, i)

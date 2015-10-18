@@ -21,6 +21,7 @@ import  Text.PrettyPrint (render)
 import           Control.Monad.State
 import           TF.Util
 import           TF.Types hiding (word, CheckerM')
+import TF.HandleDegrees
 import qualified TF.Printer as P
 
 import TF.Errors
@@ -56,7 +57,7 @@ renameWildcards = applyWildcardRule renameWildcards'
         logApplication "renameWildcards"
 
         -- let setNewIndex  = sameWildcard & _2 ?~ (maxIndex + 1)
-        let hasSameWildcard (t,i') = i' == sameWildcard ^. _2 && baseType' t == baseType' (sameWildcard ^. _1)
+        let hasSameWildcard (t,i') = i' == sameWildcard ^. _2 && baseType t == baseType (sameWildcard ^. _1)
             performSubstitution eff = eff & before.mapped.filtered hasSameWildcard._2 ?~ maxIndex+1
                                           & after.mapped.filtered hasSameWildcard._2  ?~ maxIndex+1
         modify (fmap performSubstitution)
@@ -87,7 +88,7 @@ sameDegree = applyWildcardRule sameDegree'
         when (hasUnknownBaseType topOfStack) $
             addTypeInfo topOfArgs topOfStackIndexed
 
-        let substitutor = baseType topOfStackIndexed
+        let substitutor = first baseType topOfStackIndexed
             shouldBeSubstituted t = isWildcard t && getIndex t == topOfArgsIndex
             performSubstitution eff = eff & before.mapped.filtered shouldBeSubstituted .~ substitutor
                                       & streamArgs.traverse._Defining.argType._Just.filtered shouldBeSubstituted .~ substitutor
@@ -133,7 +134,7 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m > n
             addTypeInfo topOfArgs topOfStackIndexed
         wildcardType <- getWildcardBaseType topOfStack topOfArgs
 
-        let substitutor = first ((!! (m-n)) . iterate Reference . setBaseType wildcardType) (baseType' topOfStack, topOfStackIndex)
+        let substitutor = first ((!! (m-n)) . iterate Reference . setBaseType wildcardType) (baseType topOfStack, topOfStackIndex)
             performSubstitution eff = eff & before.mapped.likeArgsIndex .~ substitutor &
                          after.mapped.likeArgsIndex .~ substitutor  
                           -- & streamArgs.traverse._Defining.argType._Right.likeArgsIndex .~ substitutor
@@ -189,7 +190,7 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m < n
             adjustBaseWildcardType = over _1 setBaseWildcardType 
 
         let substitutor :: IndexedStackType
-            substitutor = adjustReferenceType (baseType' topOfArgs, topOfArgsIndex)
+            substitutor = adjustReferenceType (baseType topOfArgs, topOfArgsIndex)
                            
             isTopOfStackType wc = isWildcard wc && getIndex wc == topOfStackIndex
             isTopOfArgsType wc = isWildcard wc && getIndex wc == topOfArgsIndex
@@ -270,7 +271,7 @@ newTopTypeNotWildcard = applyWildcardRule newTopTypeNotWildcard'
 
         let substitutor ::  IndexedStackType
             substitutor = topOfArgsIndexed & _1 %~ removeDegree m
-            substituteBaseType (t, i) = (setBaseType (baseType' topOfArgs) t, topOfArgsIndex) & _1 %~ removeDegree m
+            substituteBaseType (t, i) = (setBaseType (baseType topOfArgs) t, topOfArgsIndex) & _1 %~ removeDegree m
             isTopOfStackType wc = isWildcard wc && getIndex wc == topOfStackIndex
             
         local (storedEffects._1.after %~ tail >>>
@@ -280,21 +281,21 @@ newTopTypeNotWildcard = applyWildcardRule newTopTypeNotWildcard'
                storedEffects._1.after.mapped.filtered isTopOfStackType %~ substituteBaseType >>>
                storedEffects._1.before.mapped.filtered isTopOfStackType %~ substituteBaseType) newTopTypeNotWildcard' 
 
-hasUnknownBaseType = has _UnknownType . baseType'
+hasUnknownBaseType = has _UnknownType . baseType
 addTypeInfo possibleUnknownType concreteType = when (hasUnknownBaseType possibleUnknownType) $  do 
-          resolveUnknown ((baseType' possibleUnknownType) ^?! _UnknownType) (baseType concreteType)
+          resolveUnknown ((baseType possibleUnknownType) ^?! _UnknownType) (first baseType concreteType)
 
 adjustReferenceDegreeOfPossibleUnknownType :: DataType -> Int -> t -> WildcardRuleM ()
 adjustReferenceDegreeOfPossibleUnknownType topOfStack diff currentRefDegree = do
 
-  when (has _UnknownType (baseType' topOfStack)) $ do
+  when (has _UnknownType (baseType topOfStack)) $ do
        lift . lift $ tell [(ReferenceDegree identifier diff)] 
   where
-    identifier = baseType' topOfStack ^?! _UnknownType
+    identifier = baseType topOfStack ^?! _UnknownType
     isUnknownType = isCorrectCreatedWord identifier 
     isTarget = isUnknownType 
 
-isCorrectCreatedWord identifier (w, _)  = has _UnknownType (baseType' w)  && ((baseType' w ^?! _UnknownType) == identifier)
+isCorrectCreatedWord identifier (w, _)  = has _UnknownType (baseType w)  && ((baseType w ^?! _UnknownType) == identifier)
 
   
 
@@ -321,15 +322,15 @@ getWildcardBaseType :: DataType -> DataType -> WildcardRuleM DataType
 getWildcardBaseType t1 t2 = do
   when (not $ isWildcard' t1 && isWildcard' t2) $
      l3 $ throwing _Impossible "Both must be wildcards"
-  return $ case (baseType' t1) of
-            Wildcard -> case (baseType' t2) of
+  return $ case (baseType t1) of
+            Wildcard -> case (baseType t2) of
                            UnknownType i -> UnknownType i
                            _             -> Wildcard
-            WildcardWrapper -> case (baseType' t2) of
+            WildcardWrapper -> case (baseType t2) of
                            UnknownType i -> UnknownType i
                            _             -> WildcardWrapper
             UnknownType i -> UnknownType i
-            Dynamic -> case (baseType' t2) of
+            Dynamic -> case (baseType t2) of
                            UnknownType i -> UnknownType i
                            x           -> x
 
