@@ -6,6 +6,7 @@ module TF.HandleDegrees
          ) where
 
 import TF.Types
+import TF.Type.StackEffect
 
 
 refDegree :: DataType -> Int

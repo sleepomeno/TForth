@@ -21,6 +21,8 @@ import           TF.Types                 hiding (isSubtypeOf, word)
 import TF.HandleDegrees
 import TF.Errors
 import TF.SubtypeUtil 
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
   
 forceBeforesEmpty effs = forceEmpty before effs "Before"

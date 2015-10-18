@@ -8,6 +8,8 @@ import           TF.Types                 hiding (isSubtypeOf, word)
 import TF.Errors
 
 import TF.HasEffects.HasStackEffects
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 instance HasStackEffects ForthWord where
   getStackEffects (KnownWord pw)  = do

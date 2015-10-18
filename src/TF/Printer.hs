@@ -13,6 +13,8 @@ import Data.Maybe
 import TF.Util (nodeIso)
 
 import TF.ForthTypes
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 nested = nest 1
 
@@ -216,7 +218,10 @@ expr (Interpreted xs) = text "INTERPRETED" $+$ nested (pprint xs)
 expr (ColonExpr n sem xs) = text "COLON" <+> text n $+$ nested (ppDoc sem) $+$ nested (pprint xs)
 expr (ColonExprClash n sem) = text "COLONCLASH" <+> text n $+$ nested (ppDoc sem)
 expr (ColonExprImmediate n sem xs) = text "COLON-IMMEDIATE" <+> text n $+$ nested (ppDoc sem) $+$ nested (pprint xs)
-expr (Postpone x) = text "Postpone" $+$ nested (either text (text . view name) x)
+
+-- expr (Postpone x) = text "Postpone" $+$ nested (either text (text . view name) x)
+expr (Postpone x) = text "Postpone" $+$ nested ((either text text) x)
+
 expr (PostponeImmediate x) = text "PostponeImmediate" $+$ nested (forthWord x)
 expr (Tick effects pw) =  text "TICK" $+$ nested ((text "EFFECTS:" $+$ nested (vcat $ map stackEffect effects)) $+$ (text "PARSED_WORD:" $+$ nested (forthWord (KnownWord pw))))
 expr (Execute xs) = text "Execute" $+$ compiledOrExecuted (xs & chosen %~ MultiStackEffect)

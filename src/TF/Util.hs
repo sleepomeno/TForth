@@ -15,6 +15,9 @@ import qualified Data.Text as Te
 import Debug.Trace
 import qualified Data.Map as M
 
+import TF.Type.StackEffect
+import TF.Type.Nodes
+
 
 nodeIso = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
 

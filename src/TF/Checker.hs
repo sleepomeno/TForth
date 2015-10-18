@@ -27,6 +27,8 @@ import TF.Errors
 import TF.CheckerUtils
 import TF.HasEffects.HasStackEffects
 import TF.HasEffects.Expressions()
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 checkNodes :: [Node] -> CheckerM ForthEffect
 checkNodes nodes = do

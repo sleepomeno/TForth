@@ -18,12 +18,14 @@ import           TF.Types hiding (state, isSubtypeOf)
 import qualified TF.Types as T
 import  TF.Util
 import           Data.Maybe
-import           Text.Parsec hiding (runParser, anyToken)
+import           Text.Parsec hiding (Empty,runParser, anyToken)
 import           TF.SubtypeUtil
 import TF.Errors
 
 import Control.Monad.Reader
 
+import TF.Type.StackEffect
+import TF.Type.Nodes
 import TF.Parsers.ParserUtils
 
 
@@ -108,7 +110,7 @@ checkMethods newClass oldClass methods = do
     case oomethodsem of
      ByDefinition (effs, _) -> checkEffs effs methodName
      InferredByMethod (effs, _) -> checkEffs effs methodName
-     TF.Types.Empty -> return ()
+     Empty -> return ()
   where
     checkEffs :: [StackEffect] -> Method -> ExpressionsM ()
     checkEffs effs methodName = forM_ effs checkEff
@@ -131,7 +133,7 @@ getEffsOfMethod oomethodsem =
     case oomethodsem of
      ByDefinition (effs, _) -> effs
      InferredByMethod (effs, _) -> effs
-     TF.Types.Empty ->  []
+     Empty ->  []
 
 getNonOverwrittenMethods :: ClassName -> [Method] -> ExpressionsM [(Method, OOMethodSem)]
 getNonOverwrittenMethods oldClass methods = do
@@ -157,7 +159,7 @@ parseClass = do
   let variables = map (second $ maybe (InferredByField $ StackEffect [classType] [] [(UnknownType uniqueIdentifier, Just uniqueIdentifier'')])
                        (ByFieldDefinition . over before (classType:))) $ variables'
   let methods :: [(Method, OOMethodSem)]
-      methods = map (second $ maybe T.Empty (ByDefinition . over (_1.traverse.before) (classType:))) $ methods' 
+      methods = map (second $ maybe Empty (ByDefinition . over (_1.traverse.before) (classType:))) $ methods' 
 
   checkMethods className oldClass methods
   checkFields className oldClass variables

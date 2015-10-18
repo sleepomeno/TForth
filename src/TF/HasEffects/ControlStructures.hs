@@ -19,6 +19,8 @@ import           TF.Types                 hiding (isSubtypeOf, word)
 import TF.Errors
 
 import TF.CheckerUtils
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 getStackEffects' (IfElseExpr thens elses) = do
     -- lift $ depth += 1

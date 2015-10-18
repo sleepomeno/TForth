@@ -22,6 +22,8 @@ import           TF.Types                 hiding (isSubtypeOf, word)
 import TF.Errors
 
 import TF.CheckerUtils
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 getStackEffects' (NewObject cOrE) = do
     let compOrExec = case cOrE of { Left _ -> new _Compiled ; Right _ -> new _Executed }

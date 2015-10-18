@@ -25,6 +25,8 @@ import TF.HasEffects.HasStackEffects
 import qualified TF.HasEffects.ControlStructures as CS
 import qualified TF.HasEffects.OOP as OOP
 import TF.HasEffects.ForthWord()
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 instance HasStackEffects Expr where
 

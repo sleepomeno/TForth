@@ -23,6 +23,8 @@ import           TF.Util
 import           TF.Types hiding (word, CheckerM')
 import TF.HandleDegrees
 import qualified TF.Printer as P
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 import TF.Errors
 

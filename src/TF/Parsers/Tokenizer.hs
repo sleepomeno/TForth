@@ -19,6 +19,8 @@ import qualified Data.Text as Te
 import           Text.Parsec hiding (runParser, anyToken)
 import TF.Errors
 
+import TF.Type.Nodes
+
 
 wordIdentifier :: ParsecT String () Script' String
 wordIdentifier = do

@@ -23,6 +23,7 @@ import Data.Tree
 import Data.Tree.Zipper hiding (after,before,first)
 import  Text.PrettyPrint (render)
 import Control.Arrow (first)
+import TF.Type.Nodes
 
 munzip mab = (liftM fst mab, liftM snd mab)
 mzip (ma,mb) = do

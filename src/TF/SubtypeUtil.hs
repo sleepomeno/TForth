@@ -14,6 +14,8 @@ import           TF.Util
 import           Text.Parsec              hiding (token)
 import           TF.Types                 hiding (isSubtypeOf, word)
 import TF.HandleDegrees
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 isSubtypeOf :: DataType -> DataType -> CheckerM Bool
 isSubtypeOf t1 t2 = do

@@ -12,6 +12,8 @@ import qualified TF.Types as T
 import qualified TF.Words as W
 
 import TF.Parsers.ParserUtils
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 parseDoLoop :: ExpressionsM Expr
 parseDoLoop = do

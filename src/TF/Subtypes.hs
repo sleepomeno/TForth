@@ -10,6 +10,7 @@ import           TF.ForthTypes as FT
 import qualified Data.Set as S
 import  Control.Lens ((^?!), dimap)
 import TF.Errors
+import TF.Type.StackEffect
 
 
 -- printSubtypes = putStrLn . drawForest $ fmap (fmap (render . P.realtype)) (subtypeForest forthTypes getSubtypes)

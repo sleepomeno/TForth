@@ -11,6 +11,8 @@ import Control.Monad.Free
 import           TF.Types hiding (depth)
 import TF.WordsBuilder
 
+import TF.Type.Nodes
+
 -----------
 -- WORDS --
 -----------

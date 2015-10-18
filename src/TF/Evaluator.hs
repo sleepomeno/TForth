@@ -14,6 +14,7 @@ import Control.Lens hiding (noneOf,(??), children)
 import Data.Text.Lens 
 import Lens.Family.Total hiding ((&))
 import           Control.Monad.Cont
+import qualified Data.Text as Te
 import           Control.Error as E
 import  Text.PrettyPrint (render)
 import           Control.Monad.Reader (local)
@@ -21,6 +22,7 @@ import           Control.Monad.Error.Lens
 import           Data.Monoid ((<>))
 import           TF.SubtypeUtil
 import           TF.Types hiding (state)
+import qualified Data.Map as M
 import  TF.Util
 import Control.Arrow (first)
 import           Data.Maybe
@@ -29,6 +31,8 @@ import qualified TF.Printer as P
 import TF.Errors
 
 import TF.Parsers.ParserUtils (withTrace,withTrace')
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 
 
@@ -212,8 +216,15 @@ evalDefinedWord uk = do
 
      lift $ when (isImmediateColonDefinition definition) $ do
                input <- getInput
-               let defOrWords :: [DefOrWord]
-                   defOrWords = toListOf (body.traverse._Expr._Postpone) definition 
+               coreWords <- use wordsMap
+               let lookupW w = fromJust $ M.lookup (new _WordIdentifier (Te.pack w)) coreWords
+               -- let asdf :: Lens' (Either NameOfDefinition NameOfWord) (Either NameOfDefinition Word)
+               --     asdf = undefined
+               let defOrWords' :: [Either NameOfDefinition NameOfWord]
+                   defOrWords' = toListOf (body.traverse._Expr._Postpone) definition 
+                   defOrWords :: [Either NameOfDefinition Word]
+                   -- defOrWords = map (either id (_df lookupW)) $ _defOrWords'
+                   defOrWords = over (traverse._Right) lookupW $ defOrWords'
                    postpones :: [Token]
                    postpones = defOrWords & map
                                (either (new _Unknown . Unknown)

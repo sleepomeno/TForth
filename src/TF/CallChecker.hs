@@ -24,6 +24,8 @@ import qualified Data.Set as S
 import System.IO
 import System.FilePath
 
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 
 import TF.Paths

@@ -12,6 +12,8 @@ import TF.Errors
 import        qualified   TF.ForthTypes as FT 
 import         TF.ForthTypes (symbol, TypeSymbol(N, U, Char))
 import           TF.Types                     as Types
+import TF.Type.StackEffect
+import TF.Type.Nodes
 import TF.Subtypes
 import           TF.WordsBuilder (parsing, effect)
 

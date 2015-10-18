@@ -16,6 +16,9 @@ import qualified Data.Text as Te
 import           TF.Types 
 import TF.HandleDegrees
 
+import TF.Type.StackEffect
+import TF.Type.Nodes
+
 
 type BuildMonad = ReaderT ParseConfig (StateT BuildState Script')
 
@@ -90,7 +93,7 @@ addInfo (DESCRIPTION d' c) = do
 
 addInfo (NAME n' c) = word.name .= n'  >> c
 addInfo (ENTER s c) = do
-  setSemantics' (_Sem.TF.Types.enter) (Just s)
+  setSemantics' (_Sem.enter) (Just s)
   c
 
 addInfo (IMMEDIATE c) = word.isImmediate .= True  >> c

@@ -16,6 +16,8 @@ import           TF.Util
 import           TF.Types hiding (isSubtypeOf, word)
 import qualified TF.Printer as P
 import TF.SubtypeUtil (isSubtypeOf)
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 applyRule1 :: (StackEffect, StackEffect) -> MaybeT StackRuleM StackEffect
 applyRule1 (stE1,stE2) = do

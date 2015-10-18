@@ -20,6 +20,8 @@ import TF.Errors
 import Control.Monad.Reader
 
 import TF.Parsers.ParserUtils
+import TF.Type.StackEffect
+import TF.Type.Nodes
 
 parseCreating :: ExpressionsM Expr
 parseCreating = do

@@ -31,6 +31,9 @@ import TF.Parsers.ControlStructures
 import TF.Parsers.ParserUtils
 import TF.Parsers.Create
 import TF.Parsers.Misc
+import TF.Type.StackEffect
+import TF.Type.Nodes
+
 
 parseProgram :: CheckerM ([Node], ParseState)
 parseProgram = do
@@ -105,7 +108,8 @@ isKnownWord              = do
         (forthWord, _) <- evalKnownWord (word & isImmediate .~ False)
         return $ Just . Left $ forthWord
       else 
-        return $ Just . Right . new _Word $ word))
+        return $ Just . Right . new _Word . view name $ word))
+        -- return $ Just . Right . new _Word $ word))
 
   iopP $ show maybeDefOrWord
   return maybeDefOrWord
