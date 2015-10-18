@@ -26,7 +26,7 @@ executable TF
                    base, mtl, parallel, criterion,
                    transformers, split, errors, lens, total,
                    bifunctors, vector, parsec, text, free, pretty, pretty-show, hint, extra, filepath, profunctors
-  Build-Depends:        hspec-expectations-lens, hspec, QuickCheck >= 2.7.6, present, atto-lisp, rosezipper
+  Build-Depends:        hspec-expectations-lens, hspec, QuickCheck >= 2.7.6, rosezipper
   hs-source-dirs:      src
   default-language:    Haskell2010
   -- Ghc-Options:          -O2 -threaded -rtsopts -eventlog
@@ -40,7 +40,7 @@ Test-suite spec
                    transformers, split, errors, lens, total,
                    bifunctors, vector, parsec, text, free, pretty, pretty-show, hint, extra, filepath, profunctors
 
-  Build-Depends:        hspec-expectations-lens, hspec, QuickCheck >= 2.7.6, present, atto-lisp
+  Build-Depends:        hspec-expectations-lens, hspec, QuickCheck >= 2.7.6
   default-language:    Haskell2010
 
 -- executable Testit

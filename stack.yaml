@@ -1,8 +1,6 @@
 flags: {}
 packages:
 - '.'
-- '../present-2.2'
-- '../atto-lisp-0.2.2'
 - '../rosezipper-0.2'
 extra-deps:
 - hspec-expectations-lens-0.4.0
