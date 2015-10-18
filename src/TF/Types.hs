@@ -42,12 +42,12 @@ data DataType = Dynamic
               | UnknownType Identifier
               | Reference DataType
               | NoReference BasicType
-              deriving (Show,Read,Eq,Data,Typeable, Ord)
+              deriving (Show,Eq,Ord)
 
 data BasicType = ClassType ClassName 
                | PrimType PrimType 
                | ExecutionType ExecutionToken
-               deriving (Show,Ord,Read,Eq,Data,Typeable)
+               deriving (Show,Eq,Ord)
 
 type IndexedStackType = (DataType, Maybe Int)
                         
@@ -55,11 +55,12 @@ type UniqueArg = Int
 data RuntimeSpecification = NoR |
                             UnknownR UniqueArg |
                             KnownR StackEffect |
-                            ResolvedR UniqueArg StackEffect deriving (Show,Read,Eq,Data,Typeable, Ord)
+                            ResolvedR UniqueArg StackEffect deriving (Show,Eq,Ord)
 
-data ExecutionToken = ExecutionToken { _executiontokenSymbol :: TypeSymbol
-                                     , _executiontokenRuntimeSpecified :: Maybe RuntimeSpecification
-                                     } deriving (Show,Ord,Read,Eq,Data,Typeable)
+data ExecutionToken = ExecutionToken {
+    _executiontokenSymbol :: TypeSymbol
+  , _executiontokenRuntimeSpecified :: Maybe RuntimeSpecification }
+                    deriving (Show,Ord,Eq)
 
 
 
@@ -80,7 +81,7 @@ data DefiningArg = DefiningArg {
                     , _definingRuntimeEffect :: Maybe [(StackEffect,StackEffect)]
                       -- the effect specification in comments:
                     , _definingRuntimeSpecified :: Maybe StackEffect 
-                    }  deriving (Show,Read,Eq,Data,Typeable, Ord)
+                    }  deriving (Show,Eq,Ord)
 
 
 type DefiningOrNot = Either DefiningArg StreamArg
@@ -90,14 +91,14 @@ data StreamArg = StreamArg {
                      , _streamResolved :: Maybe String
                      , _streamEndDelimiter :: Maybe String
                      , _streamRuntimeSpecified :: Maybe RuntimeSpecification
-                    } deriving (Show,Read,Eq,Data,Typeable, Ord)
+                    } deriving (Show,Eq,Ord)
 
 ------ StackEffect -----
 data StackEffect = StackEffect {
                   _stackeffectBefore :: [IndexedStackType]
                ,  _stackeffectStreamArgs :: [DefiningOrNot]
                ,  _stackeffectAfter :: [IndexedStackType]
-                 }  deriving (Show, Ord, Read, Eq, Data, Typeable, Generic)
+                 }  deriving (Show, Eq,Ord)
 makeFields ''StackEffect
 
 
@@ -133,7 +134,7 @@ getIndex t = t ^. _2
 
 data ChangeState =   ReferenceDegree Identifier Int 
                    | ResolveUnknown Identifier DataType 
-                   deriving (Show,Read,Eq,Data,Typeable)
+                   deriving (Show,Eq)
 makePrisms ''ChangeState
 
                        
@@ -153,7 +154,7 @@ type CompiledOrExecuted a = Either a a
 _Executed = _Right
 _Compiled = _Left
 
-data Threes a b c = One'  a | Two' b |  Three' c  deriving (Show, Read, Eq, Data, Typeable, Generic)
+data Threes a b c = One'  a | Two' b |  Three' c  deriving (Show, Eq, Generic)
 makePrisms ''Threes
 
 type CompiledExecutedOrBoth a = Threes a a (a,a)
@@ -167,7 +168,7 @@ _CompAndExecutedEff = _Three'
 
 newtype UnresolvedArgsTypesState = UnresolvedArgsTypesState {
   _uatsIndexToIdentifier :: M.Map Int UniqueArg
-}  deriving (Show, Read, Eq, Data, Typeable, Generic)
+}  deriving (Show, Eq, Generic)
 makeFields ''UnresolvedArgsTypesState
 
 
@@ -175,34 +176,34 @@ type DataStackEffect = [StackEffect]
 type SingleSemiEffect = [StackArg]
 type SemiEffect = [SingleSemiEffect]
 
-data SemState = INTERPRETSTATE | COMPILESTATE deriving (Show, Read, Eq, Data, Typeable)
+data SemState = INTERPRETSTATE | COMPILESTATE deriving (Show, Eq)
 
 data MultiStackEffect = MultiStackEffect {
   _steffsMultiEffects :: DataStackEffect
-  } deriving (Show, Read, Eq, Data, Typeable)
+  } deriving (Show, Eq)
 makeWrapped ''MultiStackEffect
 
 
-data Optional = Sem Semantics | NotSet | Undefined deriving (Show, Read ,Eq, Data, Typeable)
+data Optional = Sem Semantics | NotSet | Undefined deriving (Show,Eq)
 
 data CompilationSemantics  = CompSemDefined (Optional )
                               | APPEND_EXECUTION
                               | IMMEDIATE_EXECUTION
-                                deriving (Show, Read ,Eq, Data, Typeable)
+                                deriving (Show,Eq)
 
 data InterpretationSemantics = IntSemDefined Optional 
                                  | ADOPT_EXECUTION
-                                 deriving (Show, Read ,Eq, Data, Typeable)
+                                 deriving (Show, Eq)
 
-newtype ExecutionSemantics = ExecSem (Optional ) deriving (Show, Read, Eq, Data, Typeable)
+newtype ExecutionSemantics = ExecSem (Optional ) deriving (Show, Eq)
 
-newtype RuntimeSemantics = RunSem (Optional ) deriving (Show, Read, Eq, Data, Typeable)
+newtype RuntimeSemantics = RunSem (Optional ) deriving (Show, Eq)
 
 data Semantics = Semantics {
                      _semDescription :: String
                    , _semEnter :: Maybe SemState
                    , _semEffectsOfStack:: MultiStackEffect
-                      } deriving (Show, Read, Eq, Data, Typeable)
+                      } deriving (Show, Eq)
 
 type NameOfDefinition = String  
 type Variable = String
@@ -210,7 +211,7 @@ type Method = String
 type OOFieldSem = OOFieldSem' StackEffect
 
 type Number = ()
-type Parsable = Either Te.Text Number -- Str String | Number deriving (Show, Read, Eq, Data, Typeable)
+type Parsable = Either Te.Text Number -- Str String | Number deriving (Show, Eq)
 
 -- type ColonDefinitionProcessed = (ColonDefinition, EffectsByPhase)
 data ColonDefinitionProcessed = ColonDefinitionProcessed {
@@ -227,7 +228,7 @@ data Node = ForthWord ForthWord | Expr Expr deriving Show
 -- _ForthWord = _Left
 -- _Expr = _Right
 
-newtype ForthEffect = ForthEffect ([StackEffectPair], Intersections) deriving (Show, Read, Eq, Data, Typeable)
+newtype ForthEffect = ForthEffect ([StackEffectPair], Intersections) deriving (Show, Eq)
   
 data Intersections = Intersections {
     _intersectCompileEffect :: Bool
@@ -237,7 +238,7 @@ data Intersections = Intersections {
 data FullStackEffect = FullStackEffect {
     _fullstackeffectEffects :: MultiStackEffect
   , _fullstackeffectIntersection :: Intersections
-       } deriving (Show, Read, Eq, Data, Typeable)
+       } deriving (Show, Eq)
 
 data CheckEffectsConfig = CheckEffectsConfig {
   _checkconfigForthWordOrExpr :: Maybe Node
@@ -291,11 +292,11 @@ data Word = Word {
             , _wordInterpretation :: InterpretationSemantics
             , _wordIsImmediate :: Bool
             , _wordIntersections :: Intersections
-              } deriving (Show, Read, Eq, Data, Typeable)
+              } deriving (Show, Eq)
 
 newtype Unknown = Unknown {
                      _unknownName :: String
-                  } deriving (Show, Read, Eq, Data, Typeable)
+                  } deriving (Show, Eq)
 
 data ParsedWord = ParsedWord {
                    _pwordParsed :: Parsable
@@ -303,21 +304,21 @@ data ParsedWord = ParsedWord {
                  , _pwordStacksEffects :: CompiledExecutedOrBoth MultiStackEffect
                  , _pwordEnter :: Maybe SemState
                  , _pwordIntersections :: Intersections
-                  } deriving (Show, Read, Eq, Data, Typeable)
+                  } deriving (Show, Eq)
 
 data ForthWord = UnknownE Unknown
                | DefE (CompiledOrExecuted (NameOfDefinition, [StackEffect]))
                | KnownWord ParsedWord
-               deriving (Eq, Show, Data, Typeable, Read)
+               deriving (Eq, Show)
 
 data OOFieldSem' a = ByFieldDefinition a
                    | InferredByField a
-                   deriving (Show, Read, Data, Typeable, Eq, Functor)
+                   deriving (Show, Eq, Functor)
 
 data OOMethodSem = Empty
                  | ByDefinition ([StackEffect], Bool)
                  | InferredByMethod ([StackEffect], Bool)
-                 deriving (Show, Read, Data, Typeable, Eq)
+                 deriving (Show, Eq)
 
 newtype Intersection = Intersection Bool deriving (Show)
 
@@ -345,7 +346,7 @@ makeFields ''ColonDefinitionMeta
 
 newtype Trace = Trace {
   _traceParsedExpressions :: TreeZ.TreePos TreeZ.Full String
-} deriving (Show,Read,Eq,Data,Typeable)
+} deriving (Show,Eq)
 
 data ParseState = ParseState {
                    _definedWords'        :: M.Map String Definition
@@ -365,14 +366,14 @@ makeLenses ''ParseState
 
 data BuildState = BS { _state :: SemanticsState
                      , _word :: Word
-                     } deriving (Show,Read,Eq,Data,Typeable)
+                     } deriving (Show,Eq)
 
 data ParseEffectResult = ParseEffectResult {
                              _parsedParsedEffects :: [([IndexedStackType], [IndexedStackType])]
                            , _parsedStreamArguments :: [DefiningOrNot]
                            , _parsedForcedEffect :: Bool
                            , _parsedIsIntersection :: Bool
-                           } deriving (Show,Read,Eq,Data,Typeable)
+                           } deriving (Show,Eq)
 
 data WordDefinition cont = COMPILE_COMING cont
                          | IMMEDIATE cont
@@ -390,7 +391,7 @@ data WordDefinition cont = COMPILE_COMING cont
                          | INTERPRETATION_END cont
                          | RUNTIME_START cont
                          | RUNTIME_END cont
-                         | END deriving (Functor, Show, Read, Data, Typeable)
+                         | END deriving (Functor, Show)
 
 data ParseConfig = ParseConfig {
     _configTypeCheck :: Bool
@@ -413,18 +414,18 @@ data ParseStackEffectsConfig = ParseStackEffectsConfig {
  _stackeffClassNames :: [ClassName]
  , _stackeffOnlyAfter :: Bool
  , _stackeffAllowDynamicInStackComments :: Bool
-} deriving (Show,Read,Eq,Data,Typeable)
+} deriving (Show,Eq)
 
   
 data CheckFailure = CheckFailure {
   _checkCurrentEffects :: [CompExecEffect],
   _checkNewEffects :: [CompExecEffect]
-} deriving (Show,Read,Eq,Data,Typeable)
+} deriving (Show,Eq)
 
 data AssertFailure = AssertFailure {
   _assertfailCurrentEffects :: [CompExecEffect],
   _assertfailNewEffects :: [CompExecEffect]
-} deriving (Show,Read,Eq,Data,Typeable)
+} deriving (Show,Eq)
   
 type Depth = Int
 data Info = Info {
@@ -442,7 +443,7 @@ data CustomState = CustomState {
   _customIdentifier :: Int
 , _customDepth :: Int
 , _customWordsMap :: M.Map Parsable Word
-} deriving (Show,Read,Eq,Data,Typeable)
+} deriving (Show,Eq)
 
 
 
@@ -553,7 +554,7 @@ liftUp = lift . lift
 data WildcardResult = WildcardResult { wildcardEffs :: (StackEffects, StackEffects) 
                                      , wildcardLog1 :: [ChangeState]
                                      , wildcardLog2 :: [ChangeState]
-                                     } deriving (Show,Read,Eq,Data,Typeable)
+                                     } deriving (Show,Eq)
 makeFields ''WildcardResult
 
 unStackEffectM :: MaybeT (ExceptT String IO) a -> IO (Either String (Maybe a))
@@ -565,7 +566,7 @@ data ParseStackState = ParseStackState {
                              -- , _definedWords :: [Definition]
                              , pssStreamArguments :: [[DefiningOrNot]]
                              , pssForced :: Bool
-                             }  deriving (Show, Eq, Read, Data, Typeable)
+                             }  deriving (Show, Eq)
 makeFields ''ParseStackState
 
 
@@ -575,7 +576,7 @@ data ParseStacksState = ParseStacksState {
                               , psssPreviousEffects :: [ParseStackState]
                               , psssForced' :: Bool
                               , psssIsIntersect :: Bool
-                              } deriving (Show, Eq, Read, Data, Typeable)
+                              } deriving (Show, Eq)
 makeFields ''ParseStacksState
 
 type ParseStackEffectsM = ParsecT String ParseStacksState (Reader ParseStackEffectsConfig)

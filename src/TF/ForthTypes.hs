@@ -13,7 +13,7 @@ data PrimType = PT { _pSymbol :: TypeSymbol
                   , _pDescription :: String
                   , _pSize :: Size
                   , _pAsString :: String
-                  } deriving (Show,Read,Eq,Data,Typeable, Ord)
+                  } deriving (Show,Eq,Ord)
 makeLensesWith abbreviatedFields ''PrimType
 -- makeFields ''PrimType
 
