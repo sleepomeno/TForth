@@ -2,11 +2,13 @@
 
 module TF.Util where
 
+import Prelude hiding (last)
+
 import Control.Monad.Identity
 import Control.Monad.State
 import Lens.Family.Total hiding ((&))
 import Control.Monad.Writer
-import Control.Lens
+import Control.Lens hiding (children)
 import  Text.PrettyPrint (render)
 import           Control.Error as E
 import TF.Types hiding (isSubtypeOf)
@@ -15,6 +17,7 @@ import           Text.Parsec hiding (anyToken)
 import qualified Data.Text as Te
 import Debug.Trace
 import qualified Data.Map as M
+import Data.Maybe
 
 import TF.Type.StackEffect
 import TF.Type.Nodes
@@ -101,9 +104,6 @@ toThree (stE1, stE2)
 new = review
 labeled = flip label
 
-tellExpr :: Node -> CheckerM ()
-tellExpr expr = do
-  lift . lift $ tell (Info [expr] [] [])
 
 
 resolveRuntimeType :: [(UniqueArg, StackEffect)] -> IndexedStackType -> IndexedStackType
@@ -150,6 +150,7 @@ sealed p = do
 
 is pr = isRight . matching pr
 
+liftUp = lift . lift
 
 -- showEffs'' =  mapM (iop . (\(c,e) -> render $ stackEffect c $+$ stackEffect e))
 -- showEffs' =  mapM (iop . render . stackEffect)

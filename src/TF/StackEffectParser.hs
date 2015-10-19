@@ -4,7 +4,6 @@ module TF.StackEffectParser (
     parseAssertion'
   , defParseStackEffectsConfig
   , parseEffect
-  , getEffect
   , parseCast'
   , parseFieldType)
        where
@@ -26,8 +25,6 @@ import Debug.Trace
 import TF.Errors
 
 import TF.Type.StackEffect
--- import TF.Type.Nodes
-
 
 
 atLeastOneSpace = many1 space
@@ -35,14 +32,7 @@ atLeastOneSpace = many1 space
 rParenIS = "<paren>"
 quoteIS = "<\">"
 
--- parseInputStreamArgument :: ParseStackEffectsM (Either c (Either DefiningArg StreamArg))
-parseInputStreamArgument :: ParseStackEffectsM (DataArgOrStreamArg [IndexedStackType])
-parseInputStreamArgument = do
-    let streamMarker = "'"
-        definedWordMarker = "D'"
-        markDelimitingString = "<"
-
-    let knownEffect = do 
+parseKnownEffect = do
           oldState <- getState
           putState def
           _ <- parseStackEffect
@@ -50,33 +40,42 @@ parseInputStreamArgument = do
           let from' = newState ^. _currentEffect._parsestateBefore
               to'   = newState ^. _currentEffect._parsestateAfter
           putState oldState
-          return $ StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM StackEffect
+          return (from',to')
+
+parseInputStreamArgument :: ParseStackEffectsM (DataArgOrStreamArg [IndexedStackType])
+parseInputStreamArgument = do
+    let streamMarker = "'"
+        definedWordMarker = "D'"
+        markDelimitingString = "<"
+
+    -- let knownEffect = do 
+    --       (from',to') <- parseKnownEffect
+    --       return $ StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM StackEffect
 
     let parseEndDelimiter = option Nothing $
                             fmap Just $
                               try (string rParenIS *> return ")") <|>
                               try (string quoteIS *> return "\"")
-    let definingArg = do
-          try (string definedWordMarker) <|> string (map toLower definedWordMarker)
-          n' <- many1 $ noneOf $ streamMarker ++ markDelimitingString
+    let parseArg = do
+          name <- many1 $ noneOf $ streamMarker ++ markDelimitingString
           endDelimiter <- parseEndDelimiter
           string streamMarker
+          return (name,endDelimiter)
+    let definingArg = do
+          try (string definedWordMarker) <|> string (map toLower definedWordMarker)
+          (n',endDelimiter) <- parseArg
           createType <- optionMaybe $ do
             string ":["
             result <- parseCreateType
             string "]"
             return result
-          -- runtimeEff <- parseRuntimeType
-          -- return $ _Defining # DefiningArg n' Nothing createType endDelimiter Nothing Nothing :: ParseStackEffectsM (Either DefiningArg StreamArg)
-          return $ Left (DefiningArg (ArgInfo n' Nothing endDelimiter Nothing) createType Nothing) :: ParseStackEffectsM (Either DefiningArg StreamArg)
+          return $ Defining (DefiningArg (ArgInfo n' Nothing endDelimiter Nothing) createType Nothing) :: ParseStackEffectsM DefiningOrNot
 
     let notDefiningArg = do 
           string streamMarker 
-          n' <- many1 $ noneOf $ streamMarker ++ markDelimitingString
-          endDelimiter <- parseEndDelimiter
-          string streamMarker
+          (n',endDelimiter) <- parseArg
           runtimeEff <- parseRuntimeType
-          return $ Right $ StreamArg (ArgInfo n' Nothing endDelimiter runtimeEff)
+          return $ NotDefining $ StreamArg (ArgInfo n' Nothing endDelimiter runtimeEff)
 
     result <- try definingArg <|> notDefiningArg
     atLeastOneSpace
@@ -118,7 +117,7 @@ singleTypes =  do
   classNames' <- view classNames
   let primTypes = map (try . typeWithIndex . PrimType ) types' 
       classTypes =  map (try . typeWithIndex . ClassType ) classNames'
-  return $ (try executionTypeWithIndex) : (primTypes ++ classTypes)
+  return $ try executionTypeWithIndex : (primTypes ++ classTypes)
 
 -- a list of parsers which parse either a single type or alternative types like "type1|type"
 alternativeTypes :: ParseStackEffectsM [ParseStackEffectsM [IndexedStackType]]
@@ -149,7 +148,6 @@ parseStackEffect = do
 
   let parseSingleSemiEffectBefore :: ParseStackEffectsM SingleSemiEffect
       parseSingleSemiEffectBefore = 
-        -- many  . labeled  "type symbols seperated by spaces or input stream arguments" $ parseInputStreamArgument <|> ((_DataType #) <$> choice alternativeTypes') 
         many  . labeled  "type symbols seperated by spaces or input stream arguments" $ parseInputStreamArgument <|> (DataArg <$> choice alternativeTypes') 
 
       parseSingleSemiEffectAfter :: ParseStackEffectsM [[IndexedStackType]]
@@ -179,13 +177,7 @@ parseRuntimeType = optionMaybe $ do
   string ":["
 
   let knownEffect = do 
-        oldState <- getState
-        putState def
-        _ <- parseStackEffect
-        newState <- getState
-        let from' = newState ^. _currentEffect._parsestateBefore
-            to'   = newState ^. _currentEffect._parsestateAfter
-        putState oldState
+        (from',to') <- parseKnownEffect
         return $ KnownR $ StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM RuntimeSpecification
   let unknownEffect = do
         atLeastOneSpace
@@ -210,20 +202,10 @@ executionTypeWithIndex = do
 defParseStackEffectsConfig :: ParseStackEffectsConfig
 defParseStackEffectsConfig = ParseStackEffectsConfig [] False False
 
-getEffect :: String -> IO StackEffect
-getEffect t = do
-             let (Right st) = runStackEffectParser t defParseStackEffectsConfig
-                 eff = st ^. _currentEffect
-
-                 (from'', to'') = (^._parsestateBefore) &&& (^._parsestateAfter) $ eff :: ([[[IndexedStackType]]], [[[IndexedStackType]]])
-                 (from', to') = head $ TF.StackEffectParser.allEffects $ (from'', to'') :: ([IndexedStackType], [IndexedStackType])
-             return $ StackEffect  from' (eff ^. _parsestateStreamArguments._head) to'
-
 -- | Relativ unleserliches StackEffect Parsing Resultat
 testEffect :: String -> IO ()
 testEffect t = do
   let result = flip runReader defParseStackEffectsConfig $ (runParserT (parseStackEffects >> getState) def "" t)
-  -- let result = runStackEffectParser t defParseStackEffectsConfig
   case result of
     Left err -> print err
     Right st -> 
@@ -306,7 +288,6 @@ parseFieldType' = void $ do
   atLeastOneSpace
   string ")"
                            
--- parseEffectTemplate :: String -> ParseStackEffectsConfig -> Script' ParseEffectResult
 parseEffectTemplate t conf p = do
   -- iop "parseeffectemplate"
 

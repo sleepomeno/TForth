@@ -103,10 +103,8 @@ applyRule4 stE1 stE2 = chosen' $ applyRule4' stE1 stE2
 -- shows how a inner maybet which should be null is lifted upwards to
     -- a higher maybet moand
 typeClash :: MaybeT StackRuleM StackEffect
--- typeClash = let clash :: MaybeT StackEffectM StackEffect
 typeClash = do
   checkState' <- view checkState
-  -- let clash :: EitherT SemState (ReaderT CheckEffectsConfig CheckerM) StackEffect
   let clash :: ExceptT SemState (ReaderT CheckEffectsConfig CheckerM) StackEffect
       clash = hoistEither (Left checkState')
   lift  clash

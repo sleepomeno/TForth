@@ -97,7 +97,7 @@ exportColonDefinition isForced colonName effs' compI = do
                    else
                      return $ modifier effs
 
-    modifyState $ _definedWords'.ix colonName._ColonDefinition.processedEffects .~ checkResult
+    modifyState $ _definedWords'.ix colonName._ColDef.processedEffects .~ checkResult
             
 
 changeEffectsOfState :: (StackEffect -> StackEffect) -> CheckerM ()

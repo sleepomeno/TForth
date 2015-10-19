@@ -6,7 +6,9 @@ import TF.ForthTypes
 import TF.TH
 import Lens.Simple 
 
-type DefiningOrNot = Either DefiningArg StreamArg
+-- type DefiningOrNot = Either DefiningArg StreamArg
+data DefiningOrNot = Defining DefiningArg | NotDefining StreamArg deriving (Show,Eq,Ord)
+
 type IndexedStackType = (DataType, Maybe Int)
 type Identifier = Int
 type ClassName = String
@@ -22,8 +24,8 @@ type SemiEffect = [SingleSemiEffect]
 
 
 -- type DefiningOrNot' a = Either a a
-_Defining = _Left
-_NotDefining = _Right
+-- _Defining = _Left
+-- _NotDefining = _Right
 
 data DataType = Dynamic
               | WildcardWrapper
@@ -96,4 +98,5 @@ makeLens ''ArgInfo
 makeLens ''DefiningArg
 makeLens ''StreamArg
 makeTraversals ''RuntimeSpecification
+makeTraversals ''DefiningOrNot
 makeLens ''ExecutionToken

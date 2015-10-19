@@ -4,6 +4,7 @@ module TF.Checker (
   checkNodes
   ) where
 
+import Prelude hiding (last)
 import           Control.Arrow
 import           Control.Error            as E
 -- import           Control.Lens             hiding (noneOf, (??), _Empty)
@@ -12,19 +13,23 @@ import Lens.Simple
 import           Control.Monad.Error.Lens
 import           Control.Monad.Extra
 import           Control.Monad.Reader
+import           Control.Monad.State
 import           Control.Monad.Writer
 -- import           Lens.Family.Total        hiding ((&))
 import           Text.PrettyPrint         (render, vcat)
 import           TF.StackCalculus
 import           TF.WildcardRules
+import Data.Maybe (fromJust)
 
-import           Data.List
+import           Data.List hiding (insert,last)
 import           TF.Util
 import           Text.Parsec              hiding (token)
 import qualified TF.Printer               as P
 import           TF.Types                 hiding (isSubtypeOf, word)
 import TF.HandleDegrees
 import TF.Errors
+import Data.Tree
+import Data.Tree.Zipper hiding (after,before,first,label)
 
 import TF.CheckerUtils
 import TF.HasEffects.HasStackEffects
@@ -68,15 +73,15 @@ removeWildcards effs = do
 resolveUnknownType :: Identifier -> DataType -> CheckerM ()
 resolveUnknownType identifier arg = blocked $ do
   iopW "RESOLVE UNKNOWN TYPES OF"
-  targets1 <- toListOf (_definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isUnknownType) <$> getState 
-  targets2 <- toListOf (_definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining._argType._Just) <$> getState 
-  targets3 <- toListOf (_definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._after.traverse.filtered isUnknownType) <$> getState 
+  targets1 <- toListOf (_definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isUnknownType) <$> getState 
+  targets2 <- toListOf (_definedWords'.traverse._ColDef.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining._argType._Just) <$> getState 
+  targets3 <- toListOf (_definedWords'.traverse._ColDef.processedEffects._Checked.multiEffects.traverse._after.traverse.filtered isUnknownType) <$> getState 
   iopW . render . vcat . map P.dataType $ targets1 ++ targets2 ++ targets3
   iopW $ "REPLACE WITH: " ++ (render . P.dataType $ (arg, 0))
 
-  modifyState $ _definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isUnknownType._1 %~ setBaseType arg
-  modifyState $ _definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over _Just (first $ setBaseType arg)
-  modifyState $ _definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._before.traverse.filtered isUnknownType._1 %~ setBaseType arg
+  modifyState $ _definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isUnknownType._1 %~ setBaseType arg
+  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over _Just (first $ setBaseType arg)
+  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked.multiEffects.traverse._before.traverse.filtered isUnknownType._1 %~ setBaseType arg
   modifyState $ _classFields %~ imap (updateFields updateStackEffect)
   where
     isUnknownType = isCorrectCreatedWord identifier
@@ -90,12 +95,12 @@ updateFields updateStackEffect _ fields = for fields $ second (fmap updateStackE
 adjustDegree identifier diff = do
   blocked $ do
      iopW $ "CHANGE REFERENCE DEGREES BY " ++ show diff ++ " OF"
-     targets <- toListOf (_definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isTarget) <$> getState
+     targets <- toListOf (_definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isTarget) <$> getState
      iopW . render . vcat . map P.dataType $ targets
-     modifyState $ _definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
+     modifyState $ _definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
   modifyState $ _classFields %~ imap (updateFields updateStackEffect)
 
-  -- l4 . modifyState $ _definedWords'.traverse._ColonDefinition.processedEffects._Checked.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over (_Left._Just) ((!! diff) . iterate Reference)
+  -- l4 . modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over (_Left._Just) ((!! diff) . iterate Reference)
   where
     isUnknownType = isCorrectCreatedWord identifier
     isTarget = isUnknownType
@@ -184,10 +189,10 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
                                                   (nrOfNewExecEffs > 1 && not newExecI)) || not (oldExecI || newExecI))
 
   let errorInfo = do
-        lift . lift . lift $ tell $ Info [] [CheckFailure realEffs stE2s] []
+        lift . lift . lift $ tell $ Info [CheckFailure realEffs stE2s] []
         fwordOrExpr <- asks (view forthWordOrExpr)
         when (has (_Just._Expr._Assert) fwordOrExpr) $
-           lift . lift . lift $ tell $ Info [] [] [AssertFailure realEffs stE2s] 
+           lift . lift . lift $ tell $ Info [] [AssertFailure realEffs stE2s] 
 
         return $ case fwordOrExpr of
           Just x  -> render $ either P.infoForthWord P.infoExpr $ view nodeIso $ x
@@ -257,8 +262,8 @@ st (StackEffect b args a) = do
   return $ StackEffect b args' a
 
 handleArgs :: DefiningOrNot -> CheckerM DefiningOrNot
-handleArgs d@(Right _) = return d
-handleArgs (Left arg) = do
+handleArgs d@(NotDefining _) = return d
+handleArgs (Defining arg) = do
     let currentType = view _argType arg :: (Maybe IndexedStackType)
 
     let typeOfArg = maybe (Left $ (Wildcard, Just 0)) Right currentType :: Either IndexedStackType IndexedStackType
@@ -324,6 +329,19 @@ handleArgs (Left arg) = do
       modifyState $ (_definedWords'.(at (arg ^?! _definingArgInfo._resolved._Just))) ?~ CreateDef runtimeType
     -- let arg' =  arg & _argType .~ (either (const Nothing) Just typeOfArg) & runtimeChecked .~ checked
     let arg' =  arg & _argType .~ either (const Nothing) Just typeOfArg
-    return $ Left $ arg'
+    return $ Defining $ arg'
 
 
+
+tellExpr :: Node -> CheckerM ()
+tellExpr expr = do
+  -- lift . lift $ tell (Info [expr] [] [])
+
+  let modState f = modify $ _checkedExpressions %~ f
+  modState $ insert (Node "" []) . last . children
+  modState $ modifyTree (\t -> t { rootLabel = render $ P.infoNode expr })
+  modState $ \s ->
+    if isContained s then
+      fromJust $ parent s
+    else
+      s

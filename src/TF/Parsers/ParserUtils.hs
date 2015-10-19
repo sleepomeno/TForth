@@ -35,7 +35,7 @@ withTrace' p = mzip . (first withTrace) . munzip $ p
 
 withTrace p = do
   let modState f = modifyState $ _trace._Wrapped %~ f
-  modState $insert (Node "" []) . last . children
+  modState $ insert (Node "" []) . last . children
   result <- p
   modState $ modifyTree (\t -> t { rootLabel = render $ P.infoNode result })
   modState $ \s ->

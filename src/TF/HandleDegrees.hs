@@ -8,7 +8,6 @@ module TF.HandleDegrees
 import TF.Types
 import TF.Type.StackEffect
 
-
 refDegree :: DataType -> Int
 refDegree (Reference x) = 1 + refDegree x
 refDegree (NoReference x) = 0

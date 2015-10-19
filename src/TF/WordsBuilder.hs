@@ -134,9 +134,6 @@ entering s = liftF $ ENTER s ()
 
 undefinedInterpretation = interpretationStart >> undefinedEffect >> interpretationEnd
 
-buildWord :: Free WordDefinition a -> Free WordDefinition a
-buildWord = id
-
 buildWord' :: Free WordDefinition a -> Script' BuildState
 buildWord' w = do
   conf <- ask

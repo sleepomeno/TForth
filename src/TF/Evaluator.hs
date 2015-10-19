@@ -130,7 +130,7 @@ evalKnownWord w' = do
   
 
 maybeColonDefinition :: Unknown -> ParseState -> Maybe ColonDefinitionProcessed
-maybeColonDefinition w' s   = preview (_definedWords'.at (w' ^. _Wrapped)._Just._ColonDefinition) s-- & fmap (view _ColonDefinition)
+maybeColonDefinition w' s   = preview (_definedWords'.at (w' ^. _Wrapped)._Just._ColDef) s-- & fmap (view _ColDef)
 -- maybeDefinition w' s   = view (_definedWords'.at (w' ^. name)) s
 evalNonDefinition  =  UnknownE . Unknown . view _Wrapped
 
@@ -187,7 +187,7 @@ evalCreatedWord (Unknown ukName) = do
   parseState <- lift getState
   -- let maybeEffects = view (colonDefEffects.at ukName) parseState
   let maybeEffects :: Maybe [StackEffect]
-      maybeEffects = preview (_definedWords'.at ukName._Just._CreateDefinition) parseState 
+      maybeEffects = preview (_definedWords'.at ukName._Just._CreateDef) parseState 
   effs <- hoistMaybe maybeEffects
   -- iop $ "ukname is '" ++ ukName ++ "'!"
   let st = view _stateVar parseState
@@ -240,7 +240,7 @@ evalUnknown uk =  do
   fmap fromJust . runMaybeT $ msum [evalDefinedWord uk, evalCreatedWord uk, return (evalNonDefinition uk, view _stateVar s)]
 
 handleHOTstreamArgument :: DefiningOrNot -> Token -> CheckerM DefiningOrNot
-handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) possWord = do 
+handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) possWord = do 
   (forthWord, _) <- sealed $ local (readFromStream .~ False) $ evalToken possWord
   iop "handleHOT"
   iop $ show forthWord
@@ -283,7 +283,7 @@ handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR ind
           return $ arg & _NotDefining._streamArgInfo._runtimeSpecified ?~ ResolvedR index eff
   
 
-handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (KnownR effs))))) possWord = do 
+handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (KnownR effs))))) possWord = do 
   return arg
 
 handleHOTstreamArgument arg _ = return arg
@@ -291,7 +291,10 @@ handleHOTstreamArgument arg _ = return arg
 resolveStreamArgs :: [DefiningOrNot] -> [DefiningOrNot] -> CheckerM [DefiningOrNot]
 resolveStreamArgs [] acc = return acc
 resolveStreamArgs (x:xs) acc =  do
-    let delimiter = x & (_case & on _Defining (view $ _definingArgInfo._endDelimiter) & on _NotDefining (view $ _streamArgInfo._endDelimiter))
+    -- let delimiter = x & (_case & on _Defining (view $ _definingArgInfo._endDelimiter) & on _NotDefining (view $ _streamArgInfo._endDelimiter))
+    let delimiter = case x of
+          Defining x -> x ^. _definingArgInfo._endDelimiter
+          NotDefining x -> x ^. _streamArgInfo._endDelimiter
         parseArgument :: Maybe String -> CheckerM (String, DefiningOrNot)
         parseArgument = \case
           Nothing  -> (do
@@ -311,7 +314,8 @@ resolveStreamArgs (x:xs) acc =  do
     (resolveArg, x) <- parseArgument delimiter
 
     let x' :: DefiningOrNot
-        x' = bimap (_definingArgInfo._resolved ?~ resolveArg) (_streamArgInfo._resolved ?~ resolveArg) x
+        x' = x & _Defining._definingArgInfo._resolved ?~ resolveArg
+               & _NotDefining._streamArgInfo._resolved ?~ resolveArg -- bimap (_definingArgInfo._resolved ?~ resolveArg) (_streamArgInfo._resolved ?~ resolveArg) x
 
     resolveStreamArgs xs (x':acc)
 

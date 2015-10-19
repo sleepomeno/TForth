@@ -44,16 +44,11 @@ parseNextWord = do
         parseToken = do
           w' <- (Te.toLower . Te.pack) <$> wordIdentifier
           coreWords <- use _wordsMap
-          -- let possibleWord = M.lookup (new _WordIdentifier w') coreWords
           let possibleWord = M.lookup (WordIdentifier w') coreWords
-          -- return $ maybe (new _Unknown . Unknown . Te.unpack $ w')
           return $ maybe (UnknownToken . Unknown . Te.unpack $ w')
-                         -- (new _Word)
                          WordToken
                          possibleWord
-    -- number <- (view word) <$> (lift $ local (allCoreDynamic .~ False) $ buildWord' W.number)
     number <- (view word) <$> (lift $ buildWord' W.number)
-    -- try parseToken <|> (int *> (return . new _Number $ number))
     try parseToken <|> (int *> (return . WordToken $ number))
 
 neitherDigitNorSpace x = not $ isDigit x || isSpace x
@@ -70,7 +65,7 @@ numberP = many1 digit
 parseProgram' :: ParsecT String () Script' [Token]
 parseProgram' = liftM catMaybes (parseNextToken `sepEndBy` spaces)
 
--- | parseWords returns a list of `Either Unknown (Word Semantics)`
+-- | parseWords returns a list of `Token`s
 parseWords :: String -> Script' [Token]
 parseWords t = do
   additionalWordsDefinitions <- view thirdParty  :: Script' [Free WordDefinition ()]

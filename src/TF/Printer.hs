@@ -123,8 +123,8 @@ stackEffectWithoutArgs(StackEffect b streamArgs a) = text "Effect" $+$
 definingOrNot :: DefiningOrNot -> Doc
 definingOrNot = ppDoc
 definingOrNotNice :: DefiningOrNot -> Doc
-definingOrNotNice (Left arg) = text $ "D'" <> arg ^. _definingArgInfo._argName <> "'"
-definingOrNotNice (Right arg) = text $ "'" <> arg ^. _streamArgInfo._argName <> "'"
+definingOrNotNice (Defining arg) = text $ ":'" <> arg ^. _definingArgInfo._argName <> "'"
+definingOrNotNice (NotDefining arg) = text $ "'" <> arg ^. _streamArgInfo._argName <> "'"
 
 indexedArgs :: [IndexedStackType] -> Doc
 indexedArgs indexedArgs = vcat $ map dataType (indexedArgs ^.. traverse)

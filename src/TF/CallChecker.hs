@@ -45,7 +45,7 @@ checkFile conf file = do
   hClose handle  
   
 
-runChecker' :: ParseConfig -> String -> (Either Error' ([Node], ParseState), Info)
+runChecker' :: ParseConfig -> String -> (Either Error' (([Node], ParseState), TreePos Full String), Info)
 -- runLoggingT (\loc logsource level logText -> putStrLn logText) . 
 runChecker' conf s = do 
 
@@ -57,10 +57,10 @@ runChecker' conf s = do
          c :: StackEffectM ([Node], ParseState)
          c = lift . hoistEither =<< b
          -- d :: Script' (([Node], ParseState), ())
-         d = evalRWST c conf (CustomState 0 M.empty)
-         e :: (Either Error' ([Node], ParseState), Info)
+         d = evalRWST (c >>= \res -> do { exprs <- gets checkedExpressions; return (res, exprs)} ) conf (CustomState (fromTree (Node "" [])) 0 M.empty)
+         e :: (Either Error' (([Node], ParseState), TreePos Full String), Info)
          -- e = return . runIdentity . runWriterT $ runEitherT $ fmap fst $ flip runReaderT conf $ d
-         e = runIdentity . runWriterT $ runExceptT $ fmap fst $ d
+         e = runIdentity . runWriterT $ runExceptT  $ fmap fst $  d
      e
   where
      runProgramParser :: String -> StackEffectM (Either ParseError ([Node], ParseState))
@@ -78,10 +78,13 @@ runChecker :: ParseConfig -> String -> IO ()
 runChecker config s = do
     let (res, info) = runChecker' config s
     showInfo info
-    res & (_case & on _Error (putStrLn . ("Error: " ++ ) . show)
-                 & on _Result showResult
+    case res of
+      Left err -> putStrLn $ "Error: " ++ show err
+      Right (result,treeZipper) -> do
 
-           )
+
+        putStrLn . drawTree . toTree $ treeZipper
+        showResult result
    where
      showResult :: ([Node], ParseState) -> IO ()
      showResult (_, parseState) = do
@@ -91,12 +94,12 @@ runChecker config s = do
        putStrLn checkerState
        putStrLn effs
      showInfo :: Info -> IO ()
-     showInfo (Info fexprs failures asserts) = do
-       let docs = for fexprs $ \fexpr -> nest 0 (P.infoNode fexpr)
-           info = text "INFO:" $+$ nest 1 (vcat docs)
-           failure = text "FAILURES:" $+$ nest 1 (vcat . map P.checkFailure $ failures)
+     showInfo (Info failures asserts) = do
+       -- let docs = for fexprs $ \fexpr -> nest 0 (P.infoNode fexpr)
+       -- let info = text "INFO:" $+$ nest 1 (vcat docs)
+       let failure = text "FAILURES:" $+$ nest 1 (vcat . map P.checkFailure $ failures)
            assert = text "ASSERT FAILURES:" $+$ nest 1 (vcat . map P.assertFailure $ asserts)
-       blockedWith "WRITER:" $ iop . render $ info $+$ failure $+$ assert
+       blockedWith "WRITER:" $ iop . render $ failure $+$ assert
        
      renderForthWordsOrExpr = showBoth . first (render . P.pprint) 
      showEffects' :: [(StackEffect, StackEffect)] -> String

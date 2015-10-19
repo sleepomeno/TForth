@@ -227,18 +227,18 @@ data AssertFailure = AssertFailure {
   
 type Depth = Int
 data Info = Info {
-    checkedExpressions :: [Node]
-  , infoFailures :: [CheckFailure]
+    infoFailures :: [CheckFailure]
   , assertFailures :: [AssertFailure]
 
   } deriving (Show)
 
 instance Monoid Info where
-  mempty = Info [] [] []
-  mappend (Info exprs1 fails1 asserts1) (Info exprs2 fails2 asserts2) = Info (exprs1 ++ exprs2) (fails1 ++ fails2) (asserts1 ++ asserts2)
+  mempty = Info  [] []
+  mappend (Info fails1 asserts1) (Info fails2 asserts2) = Info (fails1 ++ fails2) (asserts1 ++ asserts2)
 
 data CustomState = CustomState {
-  identifier :: Int
+  checkedExpressions :: TreeZ.TreePos TreeZ.Full String--[Node]
+, identifier :: Int
 , wordsMap :: M.Map Parsable Word
 } deriving (Show,Eq)
 
@@ -267,16 +267,6 @@ makeTraversals ''InterpretationSemantics
 makeWrapped ''ExecutionSemantics
 makeWrapped ''RuntimeSemantics
 
--- _WordIdentifier = _Left
--- _Number = _Right
-
-
-type UnknownWithState = (Unknown, SemState)
-
-defaultSemantics = Semantics "" Nothing (MultiStackEffect [])
-
-_Error = _Left
-_Result = _Right
 
 data DefOrWord = DefinitionName NameOfDefinition | WordName NameOfWord deriving (Show,Eq)
 
@@ -285,15 +275,6 @@ makeTraversals ''Token
 
 
 isImmediateColonDefinition = view $ meta.isImmediate 
-
-                      
-_TypeCheckPending = _Left
-_TypeCheckDone    = _Right
-
-_ColonDefinition = _ColDef
-_CreateDefinition = _CreateDef
-
-
 emptyEffect = [StackEffect [] [] []]
 
         
@@ -324,21 +305,10 @@ makeFields ''ExpressionsEnv
 
 type ExpressionsM = ReaderT ExpressionsEnv CheckerM
 
-liftUp = lift . lift
-
-data WildcardResult = WildcardResult { wildcardEffs :: (StackEffects, StackEffects) 
-                                     , wildcardLog1 :: [ChangeState]
-                                     , wildcardLog2 :: [ChangeState]
-                                     } deriving (Show,Eq)
-makeFields ''WildcardResult
-
-unStackEffectM :: MaybeT (ExceptT String IO) a -> IO (Either String (Maybe a))
-unStackEffectM = runExceptT . runMaybeT
 
 data ParseStackState = ParseStackState { 
                                parsestateBefore :: [[[IndexedStackType]]]
                              , parsestateAfter :: [[[IndexedStackType]]]
-                             -- , _definedWords :: [Definition]
                              , parsestateStreamArguments :: [[DefiningOrNot]]
                              , parsestateForced :: Bool
                              }  deriving (Show, Eq)

@@ -34,7 +34,6 @@ import TF.Parsers.Misc
 import TF.Type.StackEffect
 import TF.Type.Nodes
 
-
 parseProgram :: CheckerM ([Node], ParseState)
 parseProgram = do
   coreWords <- lift W.coreWordsByIdentifier :: CheckerM (M.Map Parsable Word)
@@ -90,8 +89,7 @@ isKnownWord              = do
   possWord <- anyToken
   s        <- getState
   let maybeColonDefinition' :: Unknown -> Maybe ColonDefinitionProcessed
-      maybeColonDefinition' (Unknown unknownName)   = preview (_definedWords'.at unknownName._Just._ColonDefinition) s
-  -- maybeDefOrWord <- possWord & (_case & on _Unknown (\uk -> do 
+      maybeColonDefinition' (Unknown unknownName)   = preview (_definedWords'.at unknownName._Just._ColDef) s
   maybeDefOrWord <- case possWord of
     UnknownToken uk@(Unknown unknownName) -> do 
         iopP $ unknownName
@@ -127,7 +125,6 @@ type UnresolvedArgsM = StateT (M.Map Int UniqueArg) CheckerM
   
 prepareUnresolvedArgsTypes :: (Semantics, Bool) -> CheckerM (Semantics, Bool)
 prepareUnresolvedArgsTypes (sem, forced) = do
-  -- effs <- (`evalStateT` UnresolvedArgsTypesState M.empty) $ forM (sem ^. (_semEffectsOfStack._Wrapped)) go
   effs <- (`evalStateT` M.empty) $ forM (sem ^. (_semEffectsOfStack._Wrapped)) go
   return (sem & _semEffectsOfStack._Wrapped .~ effs, forced)
   where
@@ -141,10 +138,9 @@ prepareUnresolvedArgsTypes (sem, forced) = do
 
     definingOrNot :: DefiningOrNot -> UnresolvedArgsM DefiningOrNot
     definingOrNot = \case
-      -- arg@(Left DefiningArg{}) -> return arg
-      arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) -> do
+      arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) -> do
         newIndex <- getIndex index
-        return $ arg & _Right._streamArgInfo._runtimeSpecified._Just._UnknownR .~ newIndex
+        return $ arg & _NotDefining._streamArgInfo._runtimeSpecified._Just._UnknownR .~ newIndex
       arg -> return arg
             
     indexedStackType' :: IndexedStackType -> UnresolvedArgsM IndexedStackType
