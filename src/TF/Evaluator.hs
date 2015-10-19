@@ -78,21 +78,21 @@ evalKnownWord w' = do
                 _                      -> unexpected $ "Compilation semantics not defined" ++ w' ^. name
               
 
-  modifyState (stateVar .~ fromMaybe state' (sem >>= view enter))
+  modifyState (stateVar .~ fromMaybe state' (sem >>= view _semEnter))
 
   let reverseStacks' = reverseEffects _Wrapped
                         
       reverseStacks sem' = (`fmap` sem') reverseStacks'
                                            
-      reverseEffects stack = over (effectsOfStack.stack.traverse.before) reverse .
-                             over (effectsOfStack.stack.traverse.after) reverse .
-                             over (effectsOfStack.stack.traverse.streamArgs) reverse
+      reverseEffects stack = over (_semEffectsOfStack.stack.traverse._before) reverse .
+                             over (_semEffectsOfStack.stack.traverse._after) reverse .
+                             over (_semEffectsOfStack.stack.traverse._streamArgs) reverse
       singleSemantics ::   CompiledExecutedOrBoth MultiStackEffect
-      singleSemantics = (view effectsOfStack . fromJust $ reverseStacks sem) &
+      singleSemantics = (view _semEffectsOfStack . fromJust $ reverseStacks sem) &
                            if state' == COMPILESTATE && compSem == APPEND_EXECUTION then
-                             (_CompiledEff #) 
+                             One' 
                            else 
-                             maybe (_ExecutedEff #) (\runtime execSem -> (_CompAndExecutedEff #) (view effectsOfStack . reverseStacks' $ runtime, execSem)) runtimeSem
+                             maybe Two' (\runtime execSem -> Three' (view _semEffectsOfStack . reverseStacks' $ runtime, execSem)) runtimeSem
 
   let newIntersect = if | state' == COMPILESTATE && compSem == APPEND_EXECUTION -> intersect & compileEffect .~ (intersect ^. execEffect)
                         | isNothing runtimeSem -> intersect
@@ -103,19 +103,19 @@ evalKnownWord w' = do
            & parsed .~ view parsed w'
            & stacksEffects .~ singleSemantics
            & intersections .~ newIntersect
-           & enter .~ view enter (fromJust sem)
+           & enter .~ view _semEnter (fromJust sem)
 
   let args :: MaybeT (ParsecT [Token] ParseState StackEffectM) [DefiningOrNot]
-      args = hoistMaybe $ preview (stacksEffects._ExecutedEff._Wrapped._head.streamArgs) kw `mplus`
-                          preview (stacksEffects._CompAndExecutedEff._2._Wrapped._head.streamArgs) kw 
+      args = hoistMaybe $ preview (stacksEffects._ExecutedEff._Wrapped._head._streamArgs) kw `mplus`
+                          preview (stacksEffects._CompAndExecutedEff._2._Wrapped._head._streamArgs) kw 
       resolveArgs = do
           rFS <- view readFromStream
           guard rFS
           args' <- args
           resolvedArgs <- lift $ resolveStreamArgs args' []
-          let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining.runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
-              -- return $ effs & (traverse.streamArgs .~ resolvedArgs ) & (traverse.before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse.after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
-          return $ kw & stacksEffects._ExecutedEff._Wrapped.traverse %~ ((streamArgs .~ resolvedArgs) . (before.traverse %~ resolveRuntimeType resolvedRuntimes) . (after.traverse %~ resolveRuntimeType resolvedRuntimes))
+          let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
+              -- return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse._after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
+          return $ kw & stacksEffects._ExecutedEff._Wrapped.traverse %~ ((_streamArgs .~ resolvedArgs) . (_before.traverse %~ resolveRuntimeType resolvedRuntimes) . (_after.traverse %~ resolveRuntimeType resolvedRuntimes))
 
   kw' <- runMaybeT resolveArgs
 
@@ -156,20 +156,20 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
 
   stEff <- liftUp $ tryHead (_Impossible # (colonName ++ " has no effects! Empty List!")) effs
 
-  let args = stEff ^. streamArgs
+  let args = stEff ^. _streamArgs
       compiledOrExecuted = if executed  then
-                             new _Executed
+                             Right
                            else
-                             new _Compiled
+                             Left
 
   iopP $ "EXECUTED:"
   iopP $ show executed
 
   effs' <- if executed then do
               resolvedArgs <- resolveStreamArgs args []
-              let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining.runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
-              -- return $ effs & (traverse.streamArgs .~ resolvedArgs ) & (traverse.before.traverse.filtered (\(t, _) -> has (_NoReference._ExecutionType.runtimeSpecified._Just._UnknownR) (baseType' t))) %~ (resolveRuntimeType resolvedRuntimes)
-              return $ effs & (traverse.streamArgs .~ resolvedArgs ) & (traverse.before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse.after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
+              let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
+              -- return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse.filtered (\(t, _) -> has (_NoReference._ExecutionType.runtimeSpecified._Just._UnknownR) (baseType' t))) %~ (resolveRuntimeType resolvedRuntimes)
+              return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse._after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
 
            else
               return effs
@@ -195,9 +195,9 @@ evalCreatedWord uk = do
       executed = st == INTERPRETSTATE 
 
   let compiledOrExecuted = if executed  then
-                             new _Executed
+                             Right
                            else
-                             new _Compiled
+                             Left
 
   return (DefE . compiledOrExecuted . (, effs) $ ukName, st)
 
@@ -217,7 +217,7 @@ evalDefinedWord uk = do
      lift $ when (isImmediateColonDefinition definition) $ do
                input <- getInput
                coreWords <- use wordsMap
-               let lookupW w = fromJust $ M.lookup (new _WordIdentifier (Te.pack w)) coreWords
+               let lookupW w = fromJust $ M.lookup (Left (Te.pack w)) coreWords
                -- let asdf :: Lens' (Either NameOfDefinition NameOfWord) (Either NameOfDefinition Word)
                --     asdf = undefined
                let defOrWords' :: [Either NameOfDefinition NameOfWord]
@@ -227,8 +227,8 @@ evalDefinedWord uk = do
                    defOrWords = over (traverse._Right) lookupW $ defOrWords'
                    postpones :: [Token]
                    postpones = defOrWords & map
-                               (either (new _Unknown . Unknown)
-                                       (new _Word)) 
+                               (either (Left . Unknown)
+                                       Right) 
                setInput (postpones ++ input)
      forthWord <- lift $ evalColonDefinition cDef -- state'
      return (forthWord, state')
@@ -241,7 +241,7 @@ evalUnknown uk =  do
   fmap fromJust . runMaybeT $ msum [evalDefinedWord uk, evalCreatedWord uk, return (evalNonDefinition uk, view stateVar s)]
 
 handleHOTstreamArgument :: DefiningOrNot -> Token -> CheckerM DefiningOrNot
-handleHOTstreamArgument arg@(Right (StreamArg _ _ _ (Just (UnknownR index)))) possWord = do 
+handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) possWord = do 
   (forthWord, _) <- sealed $ local (readFromStream .~ False) $ evalToken possWord
   iop "handleHOT"
   iop $ show forthWord
@@ -261,7 +261,7 @@ handleHOTstreamArgument arg@(Right (StreamArg _ _ _ (Just (UnknownR index)))) po
   where
     adjustHOT effs = do
       unless (length effs == 1) $ throwing _MultiHigherOrderArg () -- TODO eher unnoetig. überprüfe weiter unten bei effectIsSubtypeOf ob jeder effekt ein untertyp von mindestens einem typ im just ist!
-      let eff = (effs ^?! _head) :: StackEffect
+      let eff = head effs :: StackEffect
 
       iop "THIS IS THE EFF:"
       iop $ render $ P.stackEffect eff
@@ -276,15 +276,15 @@ handleHOTstreamArgument arg@(Right (StreamArg _ _ _ (Just (UnknownR index)))) po
         Just eff'' -> do
           isSubtype <- eff `effectIsSubtypeOf` eff''
           unless isSubtype $ lift $ throwing _HOTNotSubtype ()
-          return $ arg & _NotDefining.runtimeSpecified ?~ ResolvedR index eff''
+          return $ arg & _NotDefining._streamArgInfo._runtimeSpecified ?~ ResolvedR index eff''
         Nothing    -> do
           let newState = s & (unresolvedArgsTypes.at index) ?~ eff
           putState newState
           -- TODO why not done?
-          return $ arg & _NotDefining.runtimeSpecified ?~ ResolvedR index eff
+          return $ arg & _NotDefining._streamArgInfo._runtimeSpecified ?~ ResolvedR index eff
   
 
-handleHOTstreamArgument arg@(Right (StreamArg _ _ _ (Just (KnownR effs)))) possWord = do 
+handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (KnownR effs))))) possWord = do 
   return arg
 
 handleHOTstreamArgument arg _ = return arg
@@ -292,7 +292,7 @@ handleHOTstreamArgument arg _ = return arg
 resolveStreamArgs :: [DefiningOrNot] -> [DefiningOrNot] -> CheckerM [DefiningOrNot]
 resolveStreamArgs [] acc = return acc
 resolveStreamArgs (x:xs) acc =  do
-    let delimiter = x & (_case & on _Defining (view endDelimiter) & on _NotDefining (view endDelimiter))
+    let delimiter = x & (_case & on _Defining (view $ _definingArgInfo._endDelimiter) & on _NotDefining (view $ _streamArgInfo._endDelimiter))
         parseArgument :: Maybe String -> CheckerM (String, DefiningOrNot)
         parseArgument = \case
           Nothing  -> (do
@@ -312,7 +312,7 @@ resolveStreamArgs (x:xs) acc =  do
     (resolveArg, x) <- parseArgument delimiter
 
     let x' :: DefiningOrNot
-        x' = bimap (resolved ?~ resolveArg) (resolved ?~ resolveArg) x
+        x' = bimap (_definingArgInfo._resolved ?~ resolveArg) (_streamArgInfo._resolved ?~ resolveArg) x
 
     resolveStreamArgs xs (x':acc)
 

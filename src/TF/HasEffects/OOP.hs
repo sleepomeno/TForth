@@ -25,26 +25,31 @@ import TF.CheckerUtils
 import TF.Type.StackEffect
 import TF.Type.Nodes
 
+compOrExec' cOrE = case cOrE of { Left _ -> Left ; Right _ -> Right }
+
 getStackEffects' (NewObject cOrE) = do
-    let compOrExec = case cOrE of { Left _ -> new _Compiled ; Right _ -> new _Executed }
+    -- let compOrExec = case cOrE of { Left _ -> new _Compiled ; Right _ -> new _Executed }
+    -- let compOrExec = case cOrE of { Left _ -> Left ; Right _ -> Right }
+    let compOrExec = compOrExec' cOrE
         name = case cOrE of { Left x -> x; Right x -> x }
-        eff = [StackEffect [] [] [(NoReference $ _ClassType # name, Just 1)]]
+        -- eff = [StackEffect [] [] [(NoReference $ _ClassType # name, Just 1)]]
+        eff = [StackEffect [] [] [(NoReference $ ClassType name, Just 1)]]
     return $ withoutIntersect (effsAsTuples $ compOrExec eff)
 
 getStackEffects' (SuperClassMethodCall className method) = do
     let getEffs :: [(Method, OOMethodSem)] -> [StackEffect]
         getEffs methods = concatMap (\(_, methodSem) -> case methodSem of { InferredByMethod (effs, _) -> effs ; ByDefinition (effs, _) -> effs }) $ filter (\(x,_) -> x == method)  methods
     effs <- lift $ views classInterfaces (getEffs . fromJust . M.lookup className) <$> getState -- :: CheckerM [StackEffect]
-    return $ withoutIntersect $ effsAsTuples $ (_Compiled # effs)
+    return $ withoutIntersect $ effsAsTuples $ (Left effs)
 
-getStackEffects' (MethodCall compiledOrExecuted) = do
-    let compOrExec = case compiledOrExecuted of { Left _ -> new _Compiled ; Right _ -> new _Executed }
-    methodEffs <- lift $ compOrExec . concatMap snd <$> allMethodImplementationss (compiledOrExecuted ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
+getStackEffects' (MethodCall cOrE) = do
+    let compOrExec = compOrExec' cOrE
+    methodEffs <- lift $ compOrExec . concatMap snd <$> allMethodImplementationss (cOrE ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
     return $ withoutIntersect $ effsAsTuples methodEffs
 
-getStackEffects' (FieldCall compiledOrExecuted) = do
-    let compOrExec = case compiledOrExecuted of { Left _ -> new _Compiled ; Right _ -> new _Executed }
-    fieldEffs <- lift $ compOrExec . concatMap snd <$> allFieldImplementations (compiledOrExecuted ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
+getStackEffects' (FieldCall cOrE) = do
+    let compOrExec = compOrExec' cOrE
+    fieldEffs <- lift $ compOrExec . concatMap snd <$> allFieldImplementations (cOrE ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
     let fieldEffs' = fieldEffs ^. chosen
 
     -- iopC "FFFIEELDCALL"
@@ -109,27 +114,27 @@ getStackEffects' (NoName stackCommentEffects exprs clazz method) = do
                 let checkClassTypeArgument :: StackEffect -> CheckerM StackEffect
                     checkClassTypeArgument eff = do
                       uniqueIdentifier <- identifier <<+= 1
-                      let topConsumingType = preview (before._head) eff :: Maybe IndexedStackType
-                          classType = (NoReference $ _ClassType # clazz, Just uniqueIdentifier)
+                      let topConsumingType = preview (_before._head) eff :: Maybe IndexedStackType
+                          classType = (NoReference $ ClassType clazz, Just uniqueIdentifier)
                       case topConsumingType of
                        Nothing -> do
                          -- iopC $ "DDDDDDDDDDDd"
-                         return $ eff & before %~ (classType :) & after %~ (++ [classType])
+                         return $ eff & _before %~ (classType :) & _after %~ (++ [classType])
                        Just indexedType@(Wildcard, i) -> do
                          -- iopC $ "CCCCCCCCCCC"
                          let replaceWith indexedType target =  target.traverse.filtered (== indexedType) .~ classType
                              replaceStreamTypes indexedType eff = eff
                              -- & streamArgs.traverse._Defining.argType._Right.filtered (== indexedType) .~ classType
-                                                                  & streamArgs.traverse._Defining.argType._Just.filtered (== indexedType) .~ classType
-                         return $ eff & before %~ tail & before %~ (classType:) & replaceWith  indexedType before
-                                      & replaceWith indexedType after & replaceStreamTypes indexedType
+                                                                  & _streamArgs.traverse._Defining._argType._Just.filtered (== indexedType) .~ classType
+                         return $ eff & _before %~ tail & _before %~ (classType:) & replaceWith  indexedType _before
+                                      & replaceWith indexedType _after & replaceStreamTypes indexedType
                        Just indexedType@(NoReference (ClassType classname), i) -> do
 
                          iopC "BBBBBBBBBBBBBBBBB"
-                         isSubtype <- (_NoReference._ClassType # clazz) `isSubtypeOf` (_NoReference._ClassType # classname)
+                         isSubtype <- (NoReference . ClassType $ clazz) `isSubtypeOf` (NoReference . ClassType $ classname)
 
                          unless isSubtype $ malformedMethodEffect
-                         return $ eff & before._head._1._NoReference._ClassType .~ clazz
+                         return $ eff & _before._head._1._NoReference._ClassType .~ clazz
                        Just _ -> do
                          -- iopC "AAAAAAAAAAAAAAAAAAAAAA"
 

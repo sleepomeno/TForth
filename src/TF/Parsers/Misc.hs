@@ -97,7 +97,7 @@ parseColon = do
   let parseBody :: ExpressionsM Expr
       parseBody = do
         (colonDefinition, expr) <- parseColonDefinitionBody 
-        lift $ modifyState (over definedWords' $ M.insert w (review _ColonDefinition (ColonDefinitionProcessed colonDefinition NotChecked)))
+        lift $ modifyState (over definedWords' $ M.insert w (ColDef (ColonDefinitionProcessed colonDefinition NotChecked)))
         -- modifyState (over definedWords $ M.insert w colonDefinition)
         -- modifyState (lastColonDefinition ?~ w)
         lift $ modifyState $ set currentCompiling False
@@ -115,7 +115,7 @@ parseColon = do
   
         env <- ask
         (colonDefinition, expr) <- lift $ local (typeCheck .~ False) $ flip runReaderT env $ parseColonDefinitionBody
-        lift $ modifyState (over definedWords' $ M.insert w (review _ColonDefinition (ColonDefinitionProcessed colonDefinition (Failed reason))))
+        lift $ modifyState (over definedWords' $ M.insert w (ColDef(ColonDefinitionProcessed colonDefinition (Failed reason))))
         lift $ modifyState $ set currentCompiling False
         return $ ColonExprClash w stackComment
 
@@ -127,8 +127,8 @@ parseCast = do
   (sem, _) <- lift $ parseStackEffectSemantics parseCast'
   iop "CAST"
   iop $ show sem
-  let effs = sem ^. effectsOfStack._Wrapped
-  compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  let effs = sem ^. _semEffectsOfStack._Wrapped
+  compOrExec <- compOrExec'
   return $ Cast (compOrExec effs)
 
 parseAssertion :: ExpressionsM Expr
@@ -141,8 +141,8 @@ parseAssertion = do
   (sem, forced) <- lift $ parseStackEffectSemantics parseAssertion'
   iop "ASSERTION"
   -- iop $ show sem
-  let effs = sem ^. effectsOfStack._Wrapped
-  compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  let effs = sem ^. _semEffectsOfStack._Wrapped
+  compOrExec <- compOrExec'
   return $ Assert (compOrExec effs) forced
   
 parseRawAssertion :: ExpressionsM Expr
@@ -151,6 +151,6 @@ parseRawAssertion = do
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   (sem, forced) <- lift $ parseStackEffectSemantics parseEffect
   -- iop $ "RAW_ASSERTION"
-  let effs = sem ^. effectsOfStack._Wrapped
-  compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  let effs = sem ^. _semEffectsOfStack._Wrapped
+  compOrExec <- compOrExec'
   return $ Assert (compOrExec effs) forced

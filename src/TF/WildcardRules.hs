@@ -60,8 +60,8 @@ renameWildcards = applyWildcardRule renameWildcards'
 
         -- let setNewIndex  = sameWildcard & _2 ?~ (maxIndex + 1)
         let hasSameWildcard (t,i') = i' == sameWildcard ^. _2 && baseType t == baseType (sameWildcard ^. _1)
-            performSubstitution eff = eff & before.mapped.filtered hasSameWildcard._2 ?~ maxIndex+1
-                                          & after.mapped.filtered hasSameWildcard._2  ?~ maxIndex+1
+            performSubstitution eff = eff & _before.mapped.filtered hasSameWildcard._2 ?~ maxIndex+1
+                                          & _after.mapped.filtered hasSameWildcard._2  ?~ maxIndex+1
         modify (fmap performSubstitution)
         local ((storedEffects._2) .~ performSubstitution stE2) renameWildcards'
     
@@ -72,8 +72,8 @@ sameDegree = applyWildcardRule sameDegree'
       sameDegree' :: WildcardRuleM StackEffects 
       sameDegree' = do
         (stE1, stE2) <- view storedEffects
-        topOfStackIndexed@(topOfStack, _) <-  firstOf (after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (before.traverse) stE2 & orReturnEffects 
+        topOfStackIndexed@(topOfStack, _) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects 
 
         assert (isWildcard topOfStackIndexed && isWildcard topOfArgsIndexed) 
         let stE2wildcards = getWildcards stE2
@@ -92,12 +92,12 @@ sameDegree = applyWildcardRule sameDegree'
 
         let substitutor = first baseType topOfStackIndexed
             shouldBeSubstituted t = isWildcard t && getIndex t == topOfArgsIndex
-            performSubstitution eff = eff & before.mapped.filtered shouldBeSubstituted .~ substitutor
-                                      & streamArgs.traverse._Defining.argType._Just.filtered shouldBeSubstituted .~ substitutor
-                                  & after.mapped.filtered shouldBeSubstituted .~ substitutor
+            performSubstitution eff = eff & _before.mapped.filtered shouldBeSubstituted .~ substitutor
+                                      & _streamArgs.traverse._Defining._argType._Just.filtered shouldBeSubstituted .~ substitutor
+                                  & _after.mapped.filtered shouldBeSubstituted .~ substitutor
         modify (fmap performSubstitution)
-        local ((storedEffects._1) .~ (stE1 & after %~ tail) >>>
-               (storedEffects._2) .~ (performSubstitution stE2 & before %~ tail)) $ sameDegree' 
+        local ((storedEffects._1) .~ (stE1 & _after %~ tail) >>>
+               (storedEffects._2) .~ (performSubstitution stE2 & _before %~ tail)) $ sameDegree' 
 
 
 oldWildcardDegreeIsGreater :: CompExecEffect -> CompExecEffect -> CheckerM' (StackEffects, StackEffects)
@@ -109,8 +109,8 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m > n
       oldWildcardDegreeIsGreater' :: WildcardRuleM StackEffects
       oldWildcardDegreeIsGreater' = do 
         (stE1, stE2) <- view storedEffects
-        topOfStackIndexed@(topOfStack, topOfStackIndex) <-  firstOf (after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs, topOfArgsIndex) <-  firstOf (before.traverse) stE2 & orReturnEffects
+        topOfStackIndexed@(topOfStack, topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(topOfArgs, topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
         iopW "top of stack indexed"
         iopW $ show topOfStackIndexed
 
@@ -137,19 +137,19 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m > n
         wildcardType <- getWildcardBaseType topOfStack topOfArgs
 
         let substitutor = first ((!! (m-n)) . iterate Reference . setBaseType wildcardType) (baseType topOfStack, topOfStackIndex)
-            performSubstitution eff = eff & before.mapped.likeArgsIndex .~ substitutor &
-                         after.mapped.likeArgsIndex .~ substitutor  
-                          -- & streamArgs.traverse._Defining.argType._Right.likeArgsIndex .~ substitutor
-                         & streamArgs.traverse._Defining.argType._Just.likeArgsIndex .~ substitutor
+            performSubstitution eff = eff & _before.mapped.likeArgsIndex .~ substitutor &
+                         _after.mapped.likeArgsIndex .~ substitutor  
+                          -- & _streamArgs.traverse._Defining._argType._Right.likeArgsIndex .~ substitutor
+                         & _streamArgs.traverse._Defining._argType._Just.likeArgsIndex .~ substitutor
             likeArgsIndex = filtered (\wc -> isWildcard wc && getIndex wc == topOfArgsIndex) 
         modify (fmap performSubstitution)
-        let modifyReader = ((storedEffects._1) .~ (stE1 & after %~ tail) >>>
-               (storedEffects._2) .~ (stE2 & before %~ tail
-                                           & before.mapped.likeArgsIndex .~ substitutor 
-                                           & after.mapped.likeArgsIndex .~ substitutor
-                                           -- & streamArgs.traverse._Defining.argType._Left._Just.likeArgsIndex .~ substitutor
-                                           & streamArgs.traverse._Defining.argType._Just.likeArgsIndex .~ substitutor
-                                           -- & streamArgs.traverse._Defining.argType._Right.likeArgsIndex .~ substitutor
+        let modifyReader = ((storedEffects._1) .~ (stE1 & _after %~ tail) >>>
+               (storedEffects._2) .~ (stE2 & _before %~ tail
+                                           & _before.mapped.likeArgsIndex .~ substitutor 
+                                           & _after.mapped.likeArgsIndex .~ substitutor
+                                           -- & _streamArgs.traverse._Defining._argType._Left._Just.likeArgsIndex .~ substitutor
+                                           & _streamArgs.traverse._Defining._argType._Just.likeArgsIndex .~ substitutor
+                                           -- & _streamArgs.traverse._Defining._argType._Right.likeArgsIndex .~ substitutor
                                      ))
         iopW $ "show MODIFIED stored effects"
         iopW $ show . fst $ modifyReader ((stE1, stE2), undefined)
@@ -165,8 +165,8 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m < n
       newWildcardDegreeIsGreater' :: WildcardRuleM StackEffects
       newWildcardDegreeIsGreater' = do 
         (stE1, stE2) <- view storedEffects
-        topOfStackIndexed@(topOfStack,topOfStackIndex) <-  firstOf (after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (before.traverse) stE2 & orReturnEffects
+        topOfStackIndexed@(topOfStack,topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
 
         assert (isWildcard topOfStackIndexed && isWildcard topOfArgsIndexed)
         let stE2wildcards = getWildcards stE2
@@ -197,17 +197,17 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m < n
             isTopOfStackType wc = isWildcard wc && getIndex wc == topOfStackIndex
             isTopOfArgsType wc = isWildcard wc && getIndex wc == topOfArgsIndex
 
-        -- let stE1' = stE1 & streamArgs.traverse._Defining.argType._Right.filtered isTopOfStackType %~ adjustReferenceType & streamArgs.traverse._Defining.argType._Left._Just.filtered isTopOfStackType %~ adjustReferenceType
+        -- let stE1' = stE1 & _streamArgs.traverse._Defining._argType._Right.filtered isTopOfStackType %~ adjustReferenceType & _streamArgs.traverse._Defining._argType._Left._Just.filtered isTopOfStackType %~ adjustReferenceType
         let stE1' = stE1
-         -- & streamArgs.traverse._Defining.argType._Right.filtered isTopOfStackType %~ adjustReferenceType
-                                    & streamArgs.traverse._Defining.argType._Just.filtered isTopOfStackType %~ adjustReferenceType
-                         & after %~ tail & after.mapped.filtered isTopOfStackType .~ substitutor
-                         & before.mapped.filtered isTopOfStackType .~  substitutor
+         -- & _streamArgs.traverse._Defining._argType._Right.filtered isTopOfStackType %~ adjustReferenceType
+                                    & _streamArgs.traverse._Defining._argType._Just.filtered isTopOfStackType %~ adjustReferenceType
+                         & _after %~ tail & _after.mapped.filtered isTopOfStackType .~ substitutor
+                         & _before.mapped.filtered isTopOfStackType .~  substitutor
 
 
         local ((storedEffects._1) .~ stE1' >>>
-               (storedEffects._2) .~ (stE2 & before %~ tail
-                                           & after.mapped.filtered isTopOfArgsType %~ adjustBaseWildcardType)) newWildcardDegreeIsGreater'
+               (storedEffects._2) .~ (stE2 & _before %~ tail
+                                           & _after.mapped.filtered isTopOfArgsType %~ adjustBaseWildcardType)) newWildcardDegreeIsGreater'
 
 
 oldTopTypeNotWildcard :: CompExecEffect -> CompExecEffect -> CheckerM' (StackEffects, StackEffects)
@@ -218,8 +218,8 @@ oldTopTypeNotWildcard = applyWildcardRule oldTopTypeNotWildcard'
     oldTopTypeNotWildcard' = do
         (stE1, stE2) <- view storedEffects
 
-        topOfStackIndexed@(topOfStack,topOfStackIndex) <-  firstOf (after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (before.traverse) stE2 & orReturnEffects
+        topOfStackIndexed@(topOfStack,topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
 
         assert (not . isWildcard $ topOfStackIndexed)
         assert (isWildcard topOfArgsIndexed)
@@ -233,19 +233,19 @@ oldTopTypeNotWildcard = applyWildcardRule oldTopTypeNotWildcard'
 
         let substitutor = topOfStackIndexed & _1 %~ removeDegree n -- & makeResolved
 
-            adjustSte2 eff = eff & before.mapped.filtered isTopOfArgsType .~ substitutor
-                                 & after.mapped.filtered isTopOfArgsType .~ substitutor
-                                 -- & streamArgs.traverse._Defining.argType._Right.filtered (== topOfArgsIndexed) .~ topOfStackIndexed
-                                 & streamArgs.traverse._Defining.argType._Just.filtered (== topOfArgsIndexed) .~ topOfStackIndexed
+            adjustSte2 eff = eff & _before.mapped.filtered isTopOfArgsType .~ substitutor
+                                 & _after.mapped.filtered isTopOfArgsType .~ substitutor
+                                 -- & _streamArgs.traverse._Defining._argType._Right.filtered (== topOfArgsIndexed) .~ topOfStackIndexed
+                                 & _streamArgs.traverse._Defining._argType._Just.filtered (== topOfArgsIndexed) .~ topOfStackIndexed
             isTopOfArgsType wc = isWildcard wc && getIndex wc == topOfArgsIndex
 
 
-            stE2' = stE2 & before %~ tail & adjustSte2
+            stE2' = stE2 & _before %~ tail & adjustSte2
 
         addTypeInfo topOfArgs topOfStackIndexed
         modify (fmap adjustSte2)
 
-        local ((storedEffects._1.after) %~ tail >>>
+        local ((storedEffects._1._after) %~ tail >>>
                (storedEffects._2) .~ stE2') oldTopTypeNotWildcard' 
 
 
@@ -256,8 +256,8 @@ newTopTypeNotWildcard = applyWildcardRule newTopTypeNotWildcard'
      newTopTypeNotWildcard' = do
         (stE1, stE2) <- view storedEffects
 
-        topOfStackIndexed@(topOfStack,topOfStackIndex) <-  firstOf (after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (before.traverse) stE2 & orReturnEffects
+        topOfStackIndexed@(topOfStack,topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
 
         assert (isWildcard topOfStackIndexed) 
         assert (not $ isWildcard topOfArgsIndexed)
@@ -276,12 +276,12 @@ newTopTypeNotWildcard = applyWildcardRule newTopTypeNotWildcard'
             substituteBaseType (t, i) = (setBaseType (baseType topOfArgs) t, topOfArgsIndex) & _1 %~ removeDegree m
             isTopOfStackType wc = isWildcard wc && getIndex wc == topOfStackIndex
             
-        local (storedEffects._1.after %~ tail >>>
-               storedEffects._2.before %~ tail >>>
-               -- storedEffects._1.after.mapped.filtered isTopOfStackType .~ substitutor >>>
-               -- storedEffects._1.before.mapped.filtered isTopOfStackType .~ substitutor) newTopTypeNotWildcard' 
-               storedEffects._1.after.mapped.filtered isTopOfStackType %~ substituteBaseType >>>
-               storedEffects._1.before.mapped.filtered isTopOfStackType %~ substituteBaseType) newTopTypeNotWildcard' 
+        local (storedEffects._1._after %~ tail >>>
+               storedEffects._2._before %~ tail >>>
+               -- storedEffects._1._after.mapped.filtered isTopOfStackType .~ substitutor >>>
+               -- storedEffects._1._before.mapped.filtered isTopOfStackType .~ substitutor) newTopTypeNotWildcard' 
+               storedEffects._1._after.mapped.filtered isTopOfStackType %~ substituteBaseType >>>
+               storedEffects._1._before.mapped.filtered isTopOfStackType %~ substituteBaseType) newTopTypeNotWildcard' 
 
 hasUnknownBaseType = has _UnknownType . baseType
 addTypeInfo possibleUnknownType concreteType = when (hasUnknownBaseType possibleUnknownType) $  do 
@@ -336,7 +336,7 @@ getWildcardBaseType t1 t2 = do
                            UnknownType i -> UnknownType i
                            x           -> x
 
-getWildcards stE = filter isWildcard $ (view before stE) ++ (view after stE) -- ++ filter isWildcard (toListOf (streamArgs.traverse._Defining.argType._Just) stE)
+getWildcards stE = filter isWildcard $ (view _before stE) ++ (view _after stE) -- ++ filter isWildcard (toListOf (_streamArgs.traverse._Defining._argType._Just) stE)
 
 type CheckerM' = WriterT [ChangeState] CheckerM
 type ContinuationM =  ContT StackEffects (StateT (Maybe StackEffect) (WriterT [ChangeState] CheckerM)) 

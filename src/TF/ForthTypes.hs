@@ -2,19 +2,21 @@
 
 module TF.ForthTypes where
 
-import  Control.Lens
+-- import  Control.Lens
+import TF.TH
+import Lens.Simple 
 import           Data.Data hiding (DataType)
 
 
 data Size = One | Two | ImpDependent | ZeroOrMore deriving (Show,Read,Eq,Data,Typeable, Ord)
 data TypeSymbol = Flag | STrue | SFalse | Char | N | Plus_N | U | NU | X | XT | ADDR | AADDR | CADDR | D | PLUS_D | UD | DUD | XD | DYN deriving (Show,Read,Eq,Data,Ord,Typeable, Enum)
 
-data PrimType = PT { _pSymbol :: TypeSymbol
-                  , _pDescription :: String
-                  , _pSize :: Size
-                  , _pAsString :: String
+data PrimType = PT { primtypeSymbol :: TypeSymbol
+                  , description :: String
+                  , size :: Size
+                  , asString :: String
                   } deriving (Show,Eq,Ord)
-makeLensesWith abbreviatedFields ''PrimType
+makeLens ''PrimType
 -- makeFields ''PrimType
 
 flag = PT Flag "flag" One "flag"

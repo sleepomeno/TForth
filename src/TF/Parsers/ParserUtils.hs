@@ -118,6 +118,8 @@ parseUnknownName = do
 forbiddenInBranch :: ExpressionsM [Word]
 forbiddenInBranch = do
   coreWords <- use wordsMap
-  return $ catMaybes $ map (\w -> M.lookup (new _WordIdentifier w) coreWords) ["then", ";", "postpone"]
+  return $ catMaybes $ map (\w -> M.lookup (Left w) coreWords) ["then", ";", "postpone"]
 
 (</>) = mplus 
+
+compOrExec' = lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then Right else Left) <$> getState

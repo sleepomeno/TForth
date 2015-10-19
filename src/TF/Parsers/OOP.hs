@@ -33,7 +33,7 @@ parseNoName :: ExpressionsM Expr
 parseNoName = do
   parseKeyword ":noname"
   parseStackEffectSemantics <- view parseStackEffectSemantics'
-  sem <- lift $ (_Just._1 %~ (view (effectsOfStack._Wrapped))) <$> (optionMaybe $ parseStackEffectSemantics parseEffect)
+  sem <- lift $ (_Just._1 %~ (view (_semEffectsOfStack._Wrapped))) <$> (optionMaybe $ parseStackEffectSemantics parseEffect)
 
   let parseDefines = do
         clazz <- parseClassName
@@ -78,7 +78,7 @@ parseVariable = do
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   sem <- lift $ optionMaybe $ parseStackEffectSemantics parseFieldType
   -- iop $ show sem
-  return (field, sem & fmap fst & _Just %~ (fromJust . preview (effectsOfStack._Wrapped._head)))
+  return (field, sem & fmap fst & _Just %~ (fromJust . preview (_semEffectsOfStack._Wrapped._head)))
 
 parseMethod :: ExpressionsM (String, Maybe ([StackEffect], Bool))
 parseMethod = do
@@ -86,7 +86,7 @@ parseMethod = do
   method <- parseUnknownName
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   sem <- lift $ optionMaybe $ parseStackEffectSemantics parseEffect
-  return (method, sem & _Just._1 %~ view (effectsOfStack._Wrapped))
+  return (method, sem & _Just._1 %~ view (_semEffectsOfStack._Wrapped))
 
 parseEndClass :: ExpressionsM String
 parseEndClass = do
@@ -154,12 +154,12 @@ parseClass = do
   -- liftIO $ mapM_ (putStrLn . show) $ inp
   className <- parseEndClass
   -- let classType = (NoReference $ _ClassType # className, Just uniqueIdentifier')
-  let classType = (NoReference $ _ClassType # className, Just uniqueIdentifier')
+  let classType = (NoReference $ ClassType className, Just uniqueIdentifier')
 
   let variables = map (second $ maybe (InferredByField $ StackEffect [classType] [] [(UnknownType uniqueIdentifier, Just uniqueIdentifier'')])
-                       (ByFieldDefinition . over before (classType:))) $ variables'
+                       (ByFieldDefinition . over _before (classType:))) $ variables'
   let methods :: [(Method, OOMethodSem)]
-      methods = map (second $ maybe Empty (ByDefinition . over (_1.traverse.before) (classType:))) $ methods' 
+      methods = map (second $ maybe Empty (ByDefinition . over (_1.traverse._before) (classType:))) $ methods' 
 
   checkMethods className oldClass methods
   checkFields className oldClass variables
@@ -170,8 +170,8 @@ parseClass = do
   fieldsOfSuperclass <- getFieldsOfClass oldClass
   lift $ modifyState $ over classFields (M.insert className (variables ++ fieldsOfSuperclass))
 
-  lift $ modifyState $ over subtypeRelation (S.insert (_ClassType # className, _ClassType # oldClass))
-  lift $ modifyState $ over subtypeRelation (S.insert (_ClassType # className, _ClassType # className))
+  lift $ modifyState $ over subtypeRelation (S.insert (ClassType className, ClassType oldClass))
+  lift $ modifyState $ over subtypeRelation (S.insert (ClassType className, ClassType className))
   
 
   return $ OOPExpr $ Class className variables methods oldClass
@@ -184,7 +184,8 @@ parseNewObject :: ExpressionsM Expr
 parseNewObject = do
   clazz <- parseClassName
   parseKeyword "new"
-  compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  -- compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then Right else Left) <$> getState
+  compOrExec <- compOrExec'
   return $ OOPExpr $ NewObject $ compOrExec $ clazz
 
 isMethod :: String -> ExpressionsM Bool
@@ -198,13 +199,15 @@ isField field = do
   keysValues <- lift $ views classFields M.toList <$> getState
   let filtered = filter (\(_, fields) -> any (\(x,_) -> x == field) fields) keysValues :: [(ClassName, [(Variable, OOFieldSem)])]
   return . not . null $ filtered
+
   
 parseFieldCall :: ExpressionsM Expr
 parseFieldCall = do 
   fieldName <- parseUnknownName
   isField' <- isField fieldName
   guard isField'
-  compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  compOrExec <- compOrExec'
+  -- compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
   return . OOPExpr . FieldCall . compOrExec $ fieldName
 
 parseMethodCall :: ExpressionsM Expr
@@ -212,7 +215,8 @@ parseMethodCall = do
   methodName <- parseUnknownName
   isMethod' <- isMethod methodName
   guard isMethod'
-  compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  -- compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  compOrExec <- compOrExec'
   return .  OOPExpr . MethodCall . compOrExec $ methodName
 
 

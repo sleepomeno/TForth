@@ -2,7 +2,11 @@
 module TF.Types where
 
 import Prelude hiding (Word)
-import  Control.Lens hiding (makeFields)
+import  Control.Lens (Prism,prism, makeWrapped,makePrisms)
+
+
+import Lens.Simple 
+  
 import TF.TH
 
 import           Data.Data hiding (DataType)
@@ -52,12 +56,12 @@ _RuntimeNotProcessed = _Right
 _UnknownRuntimeSpecification = _Left
 _KnownRuntimeSpecification = _Right
 
-makePrisms ''DataType
-makePrisms ''BasicType
-makeFields ''DefiningArg
-makeFields ''StreamArg
-makePrisms ''RuntimeSpecification
-makeFields ''ExecutionToken
+-- makePrisms ''DataType
+-- makePrisms ''BasicType
+-- makeFields ''DefiningArg
+-- makeFields ''StreamArg
+-- makePrisms ''RuntimeSpecification
+-- makeFields ''ExecutionToken
 
 
 type ReferenceDegree = Int
@@ -68,7 +72,7 @@ getIndex t = t ^. _2
 data ChangeState =   ReferenceDegree Identifier Int 
                    | ResolveUnknown Identifier DataType 
                    deriving (Show,Eq)
-makePrisms ''ChangeState
+makeTraversals ''ChangeState
 
                        
 
@@ -83,13 +87,6 @@ _NoReferenceIndexed = prism id (\s -> case s of
                                   noref@(NoReference _, _) -> Right noref
                                   x -> Left x)
 
-newtype UnresolvedArgsTypesState = UnresolvedArgsTypesState {
-  _uatsIndexToIdentifier :: M.Map Int UniqueArg
-}  deriving (Show, Eq, Generic)
-makeFields ''UnresolvedArgsTypesState
-
-
--- type DataStackEffect = [StackEffect]
 type SingleSemiEffect = [StackArg]
 type SemiEffect = [SingleSemiEffect]
 
@@ -291,10 +288,10 @@ makeFields ''ParseState
 makePrisms ''EffectsByPhase
 makeFields ''StackEffectsWI
 makeFields ''Word
-makePrisms ''Optional
-makePrisms ''CompilationSemantics
-makePrisms ''Definition
-makePrisms ''InterpretationSemantics
+makeTraversals ''Optional
+makeTraversals ''CompilationSemantics
+makeTraversals ''Definition
+makeTraversals ''InterpretationSemantics
 makeWrapped ''ExecutionSemantics
 makeWrapped ''RuntimeSemantics
 
@@ -380,43 +377,32 @@ unStackEffectM :: MaybeT (ExceptT String IO) a -> IO (Either String (Maybe a))
 unStackEffectM = runExceptT . runMaybeT
 
 data ParseStackState = ParseStackState { 
-                               pssBefore :: [[[IndexedStackType]]]
-                             , pssAfter :: [[[IndexedStackType]]]
+                               parsestateBefore :: [[[IndexedStackType]]]
+                             , parsestateAfter :: [[[IndexedStackType]]]
                              -- , _definedWords :: [Definition]
-                             , pssStreamArguments :: [[DefiningOrNot]]
-                             , pssForced :: Bool
+                             , parsestateStreamArguments :: [[DefiningOrNot]]
+                             , parsestateForced :: Bool
                              }  deriving (Show, Eq)
-makeFields ''ParseStackState
+makeLens ''ParseStackState
 
 
 data ParseStacksState = ParseStacksState {
-                                psssTypes :: [PrimType]
-                              , psssCurrentEffect :: ParseStackState
-                              , psssPreviousEffects :: [ParseStackState]
-                              , psssForced' :: Bool
-                              , psssIsIntersect :: Bool
+                                types :: [PrimType]
+                              , currentEffect :: ParseStackState
+                              , previousEffects :: [ParseStackState]
+                              , forced' :: Bool
+                              , isIntersect :: Bool
                               } deriving (Show, Eq)
-makeFields ''ParseStacksState
+makeLens ''ParseStacksState
 
 type ParseStackEffectsM = ParsecT String ParseStacksState (Reader ParseStackEffectsConfig)
 
 instance HasDefault ParseStacksState where
-  def = ParseStacksState {}
-                & previousEffects .~ []
-                & currentEffect .~ def
-                & forced' .~ False
-                & types .~ forthTypes
-                & isIntersect .~ False
+  def = ParseStacksState forthTypes def [] False False 
 
 
 instance HasDefault ParseStackState where
-  def = ParseStackState {}
-                -- & types .~ forthTypes
-                & streamArguments .~ []
-                & before .~ []
-                -- & TF.StackEffectParser.definedWords .~ []
-                & after .~ []
-                & forced .~ False
+  def = ParseStackState [] [] [] False
 
 class HasDefault d where
   def :: d

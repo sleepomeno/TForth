@@ -44,13 +44,17 @@ parseNextWord = do
         parseToken = do
           w' <- (Te.toLower . Te.pack) <$> wordIdentifier
           coreWords <- use wordsMap
-          let possibleWord = M.lookup (new _WordIdentifier w') coreWords
-          return $ maybe (new _Unknown . Unknown . Te.unpack $ w')
-                         (new _Word)
+          -- let possibleWord = M.lookup (new _WordIdentifier w') coreWords
+          let possibleWord = M.lookup (Left w') coreWords
+          -- return $ maybe (new _Unknown . Unknown . Te.unpack $ w')
+          return $ maybe (Left . Unknown . Te.unpack $ w')
+                         -- (new _Word)
+                         Right
                          possibleWord
     -- number <- (view word) <$> (lift $ local (allCoreDynamic .~ False) $ buildWord' W.number)
     number <- (view word) <$> (lift $ buildWord' W.number)
-    try parseToken <|> (int *> (return . new _Number $ number))
+    -- try parseToken <|> (int *> (return . new _Number $ number))
+    try parseToken <|> (int *> (return . Right $ number))
 
 neitherDigitNorSpace x = not $ isDigit x || isSpace x
 

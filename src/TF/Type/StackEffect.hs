@@ -4,6 +4,7 @@ module TF.Type.StackEffect where
 
 import TF.ForthTypes
 import TF.TH
+import Lens.Simple 
 
 type DefiningOrNot = Either DefiningArg StreamArg
 type IndexedStackType = (DataType, Maybe Int)
@@ -25,38 +26,60 @@ data RuntimeSpecification = NoR |
                             ResolvedR UniqueArg StackEffect deriving (Show,Eq,Ord)
 
 data ExecutionToken = ExecutionToken {
-    _executiontokenSymbol :: TypeSymbol
-  , _executiontokenRuntimeSpecified :: Maybe RuntimeSpecification }
-                    deriving (Show,Ord,Eq)
+    symbol :: TypeSymbol
+  , exectokenRuntimeSpecified :: Maybe RuntimeSpecification
+  } deriving (Show,Ord,Eq)
+
 data BasicType = ClassType ClassName 
                | PrimType PrimType 
                | ExecutionType ExecutionToken
                deriving (Show,Eq,Ord)
-data DefiningArg = DefiningArg {
-                      _definingName :: String
-                    , _definingResolved :: Maybe String
-                    , _definingArgType :: Maybe IndexedStackType
-                    , _definingEndDelimiter :: Maybe String
 
-                    , _definingRuntimeEffect :: Maybe [(StackEffect,StackEffect)]
+data ArgInfo a = ArgInfo {
+                      argName :: String
+                    , resolved :: Maybe String
+                    , endDelimiter :: Maybe String
+                    , runtimeSpecified :: Maybe a } deriving (Show,Eq,Ord)
+  
+
+                        
+data DefiningArg = DefiningArg {
+                    --   name :: String
+                    -- , resolved :: Maybe String
+                      definingArgInfo :: ArgInfo StackEffect
+                    , argType :: Maybe IndexedStackType
+                    -- , endDelimiter :: Maybe String
+
+                    , runtimeEffect :: Maybe [(StackEffect,StackEffect)]
                       -- the effect specification in comments:
-                    , _definingRuntimeSpecified :: Maybe StackEffect 
+                    -- , runtimeSpecified :: Maybe StackEffect 
                     }  deriving (Show,Eq,Ord)
+
 data StreamArg = StreamArg {
-                       _streamName :: String
-                     , _streamResolved :: Maybe String
-                     , _streamEndDelimiter :: Maybe String
-                     , _streamRuntimeSpecified :: Maybe RuntimeSpecification
+                     --   name :: String
+                     -- , resolved :: Maybe String
+                     -- , endDelimiter :: Maybe String
+                     -- , runtimeSpecified :: Maybe RuntimeSpecification
+                      streamArgInfo :: ArgInfo RuntimeSpecification
+                        
                     } deriving (Show,Eq,Ord)
 data StackEffect = StackEffect {
-                  _stackeffectBefore :: [IndexedStackType]
-               ,  _stackeffectStreamArgs :: [DefiningOrNot]
-               ,  _stackeffectAfter :: [IndexedStackType]
+                  before :: [IndexedStackType]
+               ,  streamArgs :: [DefiningOrNot]
+               ,  after :: [IndexedStackType]
                  }  deriving (Show, Eq,Ord)
-makeFields ''StackEffect
+makeLens ''StackEffect
 
 type DataStackEffect = [StackEffect]
 
 data MultiStackEffect = MultiStackEffect {
   _steffsMultiEffects :: DataStackEffect
   } deriving (Show, Eq)
+
+makeTraversals ''DataType
+makeTraversals ''BasicType
+makeLens ''ArgInfo
+makeLens ''DefiningArg
+makeLens ''StreamArg
+makeTraversals ''RuntimeSpecification
+makeLens ''ExecutionToken

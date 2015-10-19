@@ -43,7 +43,7 @@ parseProgram = do
   st <- getState
   let effs = toListOf (effects._Wrapped._1.traverse._2) st
       allBeforesEmpty :: Bool
-      allBeforesEmpty = all (null . view before) effs
+      allBeforesEmpty = all (null . view _before) effs
 
   effectsValid <- views topLevelEmpty ((allBeforesEmpty ||) . not)
   if effectsValid then
@@ -56,7 +56,7 @@ parseNode = parseNodeWithout []
 
 parseNodeWithout :: [Word] -> CheckerM Node
 parseNodeWithout ws = withTrace $ do
-  node <- withEmpty $ liftM (new _Expr) expression </> liftM (new _ForthWord) (evalForthWordWithout ws)
+  node <- withEmpty $ liftM Expr expression </> liftM ForthWord (evalForthWordWithout ws)
 
   applyTypeChecking node
   return node
@@ -77,7 +77,7 @@ expression = (`runReaderT` env) $ parsePostpone </> try' parseIfElse </> try' pa
 parseWord :: Te.Text -> CheckerM ParsedWord
 parseWord w = do
   coreWords <- use wordsMap
-  let maybeWord = M.lookup (new _WordIdentifier w) coreWords
+  let maybeWord = M.lookup (Left w) coreWords
   when (isNothing maybeWord) $ throwing _Impossible ("Did not find word " <> Te.unpack w)
   let w'' = maybeWord ^?! _Just
     
@@ -101,14 +101,15 @@ isKnownWord              = do
         forthWord <- lift $ evalColonDefinition  (y & colonDefinition.meta.isImmediate .~ False)
         return $ Left forthWord
       else 
-        return $ Right . new _Def $ y ^. colonDefinition.meta.name)
+-- _Def
+        return $ Right . Left $ y ^. colonDefinition.meta.name)
 
     & on _Word (\word ->
       if word ^. isImmediate then do 
         (forthWord, _) <- evalKnownWord (word & isImmediate .~ False)
         return $ Just . Left $ forthWord
       else 
-        return $ Just . Right . new _Word . view name $ word))
+        return $ Just . Right . Right . view name $ word))
         -- return $ Just . Right . new _Word $ word))
 
   iopP $ show maybeDefOrWord
@@ -121,42 +122,46 @@ parseStackEffectString = do
       result = ("( " ++ ) . (++ " )") . unwords $ commentBody'
   return result
 
-type UnresolvedArgsM = StateT UnresolvedArgsTypesState CheckerM 
+type UnresolvedArgsM = StateT (M.Map Int UniqueArg) CheckerM 
   
+-- newtype UnresolvedArgsTypesState = UnresolvedArgsTypesState (M.Map Int UniqueArg)  deriving (Show, Eq)
+-- makeWrapped ''UnresolvedArgsTypesState
+
 prepareUnresolvedArgsTypes :: (Semantics, Bool) -> CheckerM (Semantics, Bool)
 prepareUnresolvedArgsTypes (sem, forced) = do
-  effs <- (`evalStateT` UnresolvedArgsTypesState M.empty) $ forM (sem ^. (effectsOfStack._Wrapped)) go
-  return (sem & effectsOfStack._Wrapped .~ effs, forced)
+  -- effs <- (`evalStateT` UnresolvedArgsTypesState M.empty) $ forM (sem ^. (_semEffectsOfStack._Wrapped)) go
+  effs <- (`evalStateT` M.empty) $ forM (sem ^. (_semEffectsOfStack._Wrapped)) go
+  return (sem & _semEffectsOfStack._Wrapped .~ effs, forced)
   where
 
     go :: StackEffect -> UnresolvedArgsM StackEffect
     go eff = do
-      bs <- mapM indexedStackType' $ eff ^. before
-      args <- mapM definingOrNot $ eff ^. streamArgs
-      as <- mapM indexedStackType' $ eff ^. after
-      return $ eff & streamArgs .~ args & before .~ bs & after .~ as
+      bs <- mapM indexedStackType' $ eff ^. _before
+      args <- mapM definingOrNot $ eff ^. _streamArgs
+      as <- mapM indexedStackType' $ eff ^. _after
+      return $ eff & _streamArgs .~ args & _before .~ bs & _after .~ as
 
     definingOrNot :: DefiningOrNot -> UnresolvedArgsM DefiningOrNot
     definingOrNot = \case
       -- arg@(Left DefiningArg{}) -> return arg
-      arg@(Right (StreamArg _ _ _ (Just (UnknownR index)))) -> do
+      arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) -> do
         newIndex <- getIndex index
-        return $ arg & _Right.runtimeSpecified._Just._UnknownR .~ newIndex
+        return $ arg & _Right._streamArgInfo._runtimeSpecified._Just._UnknownR .~ newIndex
       arg -> return arg
             
     indexedStackType' :: IndexedStackType -> UnresolvedArgsM IndexedStackType
     indexedStackType' (arg@(NoReference (ExecutionType (ExecutionToken _ (Just (UnknownR index))))), i) = do
       newIndex <- getIndex index
-      return (arg & _NoReference._ExecutionType.runtimeSpecified._Just._UnknownR .~ newIndex, i)
+      return (arg & _NoReference._ExecutionType._exectokenRuntimeSpecified._Just._UnknownR .~ newIndex, i)
     indexedStackType' x = return x
 
     getIndex index = do 
-      index' <- use (indexToIdentifier.at index)  :: UnresolvedArgsM (Maybe Int)
+      index' <- use (at index)  :: UnresolvedArgsM (Maybe Int)
       case index' of
         Just index'' -> return index''
         Nothing      -> do
           uniqueIdentifier <- lift $ identifier <<+= 1
-          indexToIdentifier.at index ?= uniqueIdentifier
+          at index ?= uniqueIdentifier
           return uniqueIdentifier
       
 parseStackEffectSemantics :: (String -> ParseStackEffectsConfig -> Script' ParseEffectResult) -> CheckerM (Semantics, Bool)
@@ -177,5 +182,5 @@ parseStackEffectSemantics p = do
 
                               effects' =  view parsedEffects result & traverse %~ (\(b,a) -> StackEffect (reverse b) streamArgs (reverse a))
                      in
-                       (def :: Semantics) & effectsOfStack._Wrapped .~ effects'  & (, result ^. forcedEffect)
+                       (def :: Semantics) & _semEffectsOfStack._Wrapped .~ effects'  & (, result ^. forcedEffect)
 

@@ -66,21 +66,21 @@ removeWildcards effs = do
 resolveUnknownType :: Identifier -> DataType -> CheckerM ()
 resolveUnknownType identifier arg = blocked $ do
   iopW "RESOLVE UNKNOWN TYPES OF"
-  targets1 <- toListOf (definedWords'.traverse._CreateDefinition.traverse.after.traverse.filtered isUnknownType) <$> getState 
-  targets2 <- toListOf (definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse.streamArgs.traverse._Defining.argType._Just) <$> getState 
-  targets3 <- toListOf (definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse.after.traverse.filtered isUnknownType) <$> getState 
+  targets1 <- toListOf (definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isUnknownType) <$> getState 
+  targets2 <- toListOf (definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining._argType._Just) <$> getState 
+  targets3 <- toListOf (definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._after.traverse.filtered isUnknownType) <$> getState 
   iopW . render . vcat . map P.dataType $ targets1 ++ targets2 ++ targets3
   iopW $ "REPLACE WITH: " ++ (render . P.dataType $ (arg, 0))
 
-  modifyState $ definedWords'.traverse._CreateDefinition.traverse.after.traverse.filtered isUnknownType._1 %~ setBaseType arg
-  modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse.streamArgs.traverse._Defining.filtered hasUnknownArgType.argType %~ over _Just (first $ setBaseType arg)
-  modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse.before.traverse.filtered isUnknownType._1 %~ setBaseType arg
+  modifyState $ definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isUnknownType._1 %~ setBaseType arg
+  modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over _Just (first $ setBaseType arg)
+  modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._before.traverse.filtered isUnknownType._1 %~ setBaseType arg
   modifyState $ classFields %~ imap (updateFields updateStackEffect)
   where
     isUnknownType = isCorrectCreatedWord identifier
-    hasUnknownArgType x = has (argType._Just) x && has _UnknownType (baseType (x ^?! argType._Just._1))
+    hasUnknownArgType x = has (_argType._Just) x && has _UnknownType (baseType (x ^?! _argType._Just._1))
     updateStackEffect :: StackEffect -> StackEffect
-    updateStackEffect stEff = stEff & after.traverse.filtered isUnknownType._1 %~ setBaseType arg
+    updateStackEffect stEff = stEff & _after.traverse.filtered isUnknownType._1 %~ setBaseType arg
 
 updateFields :: (StackEffect -> StackEffect) -> ClassName -> [(Variable, OOFieldSem)] -> [(Variable, OOFieldSem)]
 updateFields updateStackEffect _ fields = for fields $ second (fmap updateStackEffect)
@@ -88,16 +88,16 @@ updateFields updateStackEffect _ fields = for fields $ second (fmap updateStackE
 adjustDegree identifier diff = do
   blocked $ do
      iopW $ "CHANGE REFERENCE DEGREES BY " ++ show diff ++ " OF"
-     targets <- toListOf (definedWords'.traverse._CreateDefinition.traverse.after.traverse.filtered isTarget) <$> getState
+     targets <- toListOf (definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isTarget) <$> getState
      iopW . render . vcat . map P.dataType $ targets
-     modifyState $ definedWords'.traverse._CreateDefinition.traverse.after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
+     modifyState $ definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
   modifyState $ classFields %~ imap (updateFields updateStackEffect)
 
-  -- l4 . modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.traverse.streamArgs.traverse._Defining.filtered hasUnknownArgType.argType %~ over (_Left._Just) ((!! diff) . iterate Reference)
+  -- l4 . modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over (_Left._Just) ((!! diff) . iterate Reference)
   where
     isUnknownType = isCorrectCreatedWord identifier
     isTarget = isUnknownType
-    updateStackEffect stEff = stEff & after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
+    updateStackEffect stEff = stEff & _after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
 
 isCorrectCreatedWord identifier (w, _)  = has _UnknownType (baseType w)  && ((baseType w ^?! _UnknownType) == identifier)
 
@@ -256,7 +256,7 @@ st (StackEffect b args a) = do
 handleArgs :: DefiningOrNot -> CheckerM DefiningOrNot
 handleArgs d@(Right _) = return d
 handleArgs (Left arg) = do
-    let currentType = view argType arg :: (Maybe IndexedStackType)
+    let currentType = view _argType arg :: (Maybe IndexedStackType)
 
     let typeOfArg = maybe (Left $ (Wildcard, Just 0)) Right currentType :: Either IndexedStackType IndexedStackType
     uniqueId <- identifier <<+= 1
@@ -264,7 +264,7 @@ handleArgs (Left arg) = do
     uniqueId3 <- identifier <<+= 1
     -- let maybeRuntimeType = _Just.chosen.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe (Either [(StackEffect,StackEffect)] [(StackEffect,StackEffect)])
     -- let maybeRuntimeType = _Just.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
-    let maybeRuntimeType = view runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
+    let maybeRuntimeType = view _runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
         initialRuntimeType = StackEffect [] [] [first Reference $ fromMaybe (Wildcard, Just 0) currentType]
         defaultRuntimeType = StackEffect [] [] [first Reference defaultR]
         defaultR = case currentType of
@@ -317,10 +317,10 @@ handleArgs (Left arg) = do
                             else
                                 return [defaultRuntimeType]
 
-    when (has (resolved._Just) arg) $
-      modifyState $ definedWords'.(at (arg ^?! resolved._Just)) ?~ new _CreateDefinition runtimeType
-    -- let arg' =  arg & argType .~ (either (const Nothing) Just typeOfArg) & runtimeChecked .~ checked
-    let arg' =  arg & argType .~ either (const Nothing) Just typeOfArg
+    when (has (_definingArgInfo._resolved._Just) arg) $
+      modifyState $ definedWords'.(at (arg ^?! _definingArgInfo._resolved._Just)) ?~ CreateDef runtimeType
+    -- let arg' =  arg & _argType .~ (either (const Nothing) Just typeOfArg) & runtimeChecked .~ checked
+    let arg' =  arg & _argType .~ either (const Nothing) Just typeOfArg
     return $ Left $ arg'
 
 

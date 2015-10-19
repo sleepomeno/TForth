@@ -46,8 +46,8 @@ parseInputStreamArgument = do
           putState def
           _ <- parseStackEffect
           newState <- getState
-          let from' = newState ^. currentEffect.before
-              to'   = newState ^. currentEffect.after
+          let from' = newState ^. _currentEffect._parsestateBefore
+              to'   = newState ^. _currentEffect._parsestateAfter
           putState oldState
           return $ StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM StackEffect
 
@@ -66,8 +66,8 @@ parseInputStreamArgument = do
             string "]"
             return result
           -- runtimeEff <- parseRuntimeType
-          -- return $ _Defining # DefiningArg n' Nothing (Left Nothing) endDelimiter Nothing runtimeEff False :: ParseStackEffectsM (Either DefiningArg StreamArg)
-          return $ _Defining # DefiningArg n' Nothing createType endDelimiter Nothing Nothing :: ParseStackEffectsM (Either DefiningArg StreamArg)
+          -- return $ _Defining # DefiningArg n' Nothing createType endDelimiter Nothing Nothing :: ParseStackEffectsM (Either DefiningArg StreamArg)
+          return $ Left (DefiningArg (ArgInfo n' Nothing endDelimiter Nothing) createType Nothing) :: ParseStackEffectsM (Either DefiningArg StreamArg)
 
     let notDefiningArg = do 
           string streamMarker 
@@ -75,11 +75,12 @@ parseInputStreamArgument = do
           endDelimiter <- parseEndDelimiter
           string streamMarker
           runtimeEff <- parseRuntimeType
-          return $ _NotDefining # StreamArg n' Nothing endDelimiter runtimeEff
+          return $ Right $ StreamArg (ArgInfo n' Nothing endDelimiter runtimeEff)
 
     result <- try definingArg <|> notDefiningArg
     atLeastOneSpace
-    return $ _StreamArg # result
+    -- return $ _StreamArg # result
+    return $ Right result
 
 parseStackEffects :: ParseStackEffectsM String
 parseStackEffects = try (parseStackEffects' ('/', False)) <|> parseStackEffects' ('&', True)
@@ -91,7 +92,7 @@ parseStackEffects' (delimiter, isIntersect') = do
   parseStackEffect `sepBy` P.char delimiter
                              
 
-  modifyState $ isIntersect .~ isIntersect'
+  modifyState $ _isIntersect .~ isIntersect'
 
   string ")"
 
@@ -99,10 +100,10 @@ parseStackEffects' (delimiter, isIntersect') = do
 typeWithIndex :: BasicType -> ParseStackEffectsM IndexedStackType
 typeWithIndex type' = do
   degreeRef <- length <$> many (P.char '*')
-  let type'' = (!! degreeRef) . iterate Reference $ if (has _PrimType type' && type' ^?! _PrimType.symbol == FT.X) then Wildcard else NoReference type'
+  let type'' = (!! degreeRef) . iterate Reference $ if (has _PrimType type' && type' ^?! (_PrimType._primtypeSymbol) == FT.X) then Wildcard else NoReference type'
   string $ case type' of
               ClassType clazz -> clazz
-              PrimType primType -> view asString primType
+              PrimType primType -> view _asString primType
               ExecutionType _ -> "xt"
   index <- optionMaybe (fmap digitToInt digit) 
   return (type'', index)
@@ -110,12 +111,12 @@ typeWithIndex type' = do
 -- a list of parsers which parse a string indicating a single type
 singleTypes :: ParseStackEffectsM [ParseStackEffectsM IndexedStackType]
 singleTypes =  do
-  types' <- view types <$> getState
+  types' <- view _types <$> getState
 
 
   classNames' <- view classNames
-  let primTypes = map (try . typeWithIndex . (_PrimType # )) types' 
-      classTypes =  map (try . typeWithIndex . (_ClassType # )) classNames'
+  let primTypes = map (try . typeWithIndex . PrimType ) types' 
+      classTypes =  map (try . typeWithIndex . ClassType ) classNames'
   return $ (try executionTypeWithIndex) : (primTypes ++ classTypes)
 
 -- a list of parsers which parse either a single type or alternative types like "type1|type"
@@ -135,11 +136,11 @@ alternativeTypes = do
 parseStackEffect
   :: ParseStackEffectsM ()
 parseStackEffect = do
-  c' <- view currentEffect <$> getState
-  unless (c' == def) $ modifyState $ previousEffects %~ (c' : )
-  modifyState $ currentEffect .~ def
+  c' <- view _currentEffect <$> getState
+  unless (c' == def) $ modifyState $ _previousEffects %~ (c' : )
+  modifyState $ _currentEffect .~ def
 
-  let s = currentEffect -- define a short lens for the current effect
+  let s = _currentEffect -- define a short lens for the current effect
   
   atLeastOneSpace
 
@@ -147,7 +148,8 @@ parseStackEffect = do
 
   let parseSingleSemiEffectBefore :: ParseStackEffectsM SingleSemiEffect
       parseSingleSemiEffectBefore = 
-        many  . labeled  "type symbols seperated by spaces or input stream arguments" $ parseInputStreamArgument <|> ((_DataType #) <$> choice alternativeTypes') 
+        -- many  . labeled  "type symbols seperated by spaces or input stream arguments" $ parseInputStreamArgument <|> ((_DataType #) <$> choice alternativeTypes') 
+        many  . labeled  "type symbols seperated by spaces or input stream arguments" $ parseInputStreamArgument <|> (Left <$> choice alternativeTypes') 
 
       parseSingleSemiEffectAfter :: ParseStackEffectsM [[IndexedStackType]]
       parseSingleSemiEffectAfter = many . labeled  "type symbols seperated by spaces" . choice $ alternativeTypes'
@@ -158,16 +160,16 @@ parseStackEffect = do
 
   let (typesBefore, streamArgs) = unzip . map (lefts &&& rights) $ dataTypesAndStreamArgs
 
-  modifyState $ s.before .~  typesBefore
-  modifyState $ s.streamArguments .~ streamArgs
+  modifyState $ s._parsestateBefore .~  typesBefore
+  modifyState $ s._parsestateStreamArguments .~ streamArgs
 
   forced'' <-  (try (return False <* string "--") <|>
                   return True <* string "-!-")
-  modifyState $ forced' .~ forced''
+  modifyState $ _forced' .~ forced''
   atLeastOneSpace
 
   typesAfter <- parseSemiEffects parseSingleSemiEffectAfter
-  modifyState $ s.after .~  typesAfter
+  modifyState $ s._parsestateAfter .~  typesAfter
 
 
 
@@ -180,16 +182,16 @@ parseRuntimeType = optionMaybe $ do
         putState def
         _ <- parseStackEffect
         newState <- getState
-        let from' = newState ^. currentEffect.before
-            to'   = newState ^. currentEffect.after
+        let from' = newState ^. _currentEffect._parsestateBefore
+            to'   = newState ^. _currentEffect._parsestateAfter
         putState oldState
-        return $ _KnownR # StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM RuntimeSpecification
+        return $ KnownR $ StackEffect (concat $ concat from') [] (concat $ concat to') :: ParseStackEffectsM RuntimeSpecification
   let unknownEffect = do
         atLeastOneSpace
         string "EFF"
         index <- option (-1) (fmap digitToInt digit)  -- TODO index?!
         atLeastOneSpace
-        return $ _UnknownR # index
+        return $ UnknownR index
   result <- try unknownEffect <|> knownEffect
   string "]"
   return result
@@ -210,11 +212,11 @@ defParseStackEffectsConfig = ParseStackEffectsConfig [] False False
 getEffect :: String -> IO StackEffect
 getEffect t = do
              let (Right st) = runStackEffectParser t defParseStackEffectsConfig
-                 eff = st ^. currentEffect
+                 eff = st ^. _currentEffect
 
-                 (from'', to'') = (^.before) &&& (^.after) $ eff :: ([[[IndexedStackType]]], [[[IndexedStackType]]])
+                 (from'', to'') = (^._parsestateBefore) &&& (^._parsestateAfter) $ eff :: ([[[IndexedStackType]]], [[[IndexedStackType]]])
                  (from', to') = head $ TF.StackEffectParser.allEffects $ (from'', to'') :: ([IndexedStackType], [IndexedStackType])
-             return $ StackEffect  from' (eff ^. streamArguments._head) to'
+             return $ StackEffect  from' (eff ^. _parsestateStreamArguments._head) to'
 
 -- | Relativ unleserliches StackEffect Parsing Resultat
 testEffect :: String -> IO ()
@@ -224,11 +226,11 @@ testEffect t = do
   case result of
     Left err -> print err
     Right st -> 
-      forM_ (st^.currentEffect : st^.previousEffects) $ \x -> do
-      print $ x^.before
-      print $ x^.streamArguments
-      print $ x^.after
-      print $ st^.forced'
+      forM_ (st^._currentEffect : st^._previousEffects) $ \x -> do
+      print $ x^._parsestateBefore
+      print $ x^._parsestateStreamArguments
+      print $ x^._parsestateAfter
+      print $ st^._forced'
 
 
 parseFieldType t config = parseEffectTemplate t config parseFieldType'
@@ -279,12 +281,12 @@ parseAssertion'' = void $ do
 
   traceM $ "Length: " ++ show (length results)
 
-  let assertions = for results $ \t -> def & before .~ [[]] & after .~ [t] & streamArguments .~ [[]]
+  let assertions = for results $ \t -> def & _parsestateBefore .~ [[]] & _parsestateAfter .~ [t] & _parsestateStreamArguments .~ [[]]
 
-  modifyState $ currentEffect .~ head assertions
-  modifyState $ previousEffects .~ tail assertions
+  modifyState $ _currentEffect .~ head assertions
+  modifyState $ _previousEffects .~ tail assertions
 
-  modifyState $ forced' .~ forced
+  modifyState $ _forced' .~ forced
   string ")"
 
 parseFieldType' :: ParseStackEffectsM ()
@@ -297,9 +299,9 @@ parseFieldType' = void $ do
 
   singleTypes' <- singleTypes
   fieldType <- choice singleTypes'
-  modifyState $ currentEffect.before .~ [[]]
-  modifyState $ currentEffect.streamArguments .~ [[]]
-  modifyState $ currentEffect.after .~ [[[fieldType]]]
+  modifyState $ _currentEffect._parsestateBefore .~ [[]]
+  modifyState $ _currentEffect._parsestateStreamArguments .~ [[]]
+  modifyState $ _currentEffect._parsestateAfter .~ [[[fieldType]]]
   atLeastOneSpace
   string ")"
                            
@@ -309,7 +311,7 @@ parseEffectTemplate t conf p = do
 
   allowDynamic <- view allowDynamicInStackComments
   initialState <- if allowDynamic then
-                    return $ def & types %~ (FT.dyn :)
+                    return $ def & _types %~ (FT.dyn :)
                   else
                     return def
   let parseResult = flip runReader conf $ (runParserT (p >> getState) initialState "" t)
@@ -320,21 +322,21 @@ parseEffectTemplate t conf p = do
       throwing _ParseErr'  . show $ e
     Right st -> do
         -- iop "parseeffectemplate right"
-        let streamArgsLists = view (traverse.streamArguments) allEffects
+        let streamArgsLists = view (traverse._parsestateStreamArguments) allEffects
             sameStreamArgs = length (group streamArgsLists) <= 1
         when (not sameStreamArgs) $
           throwing _NotSameStreamArgs t -- every stack effect must
           -- have the same stream args
 
-        return $ ParseEffectResult allEffectsCombos streamArgs (st^.forced') (st^.isIntersect)
+        return $ ParseEffectResult allEffectsCombos streamArgs (st^._forced') (st^._isIntersect)
        where
-         allEffects = st^.currentEffect : st^.previousEffects
+         allEffects = st^._currentEffect : st^._previousEffects
          streamArgs :: [DefiningOrNot]
-         streamArgs = head . view (currentEffect.streamArguments) $ st
+         streamArgs = head . view (_currentEffect._parsestateStreamArguments) $ st
          allEffectsCombos :: [([IndexedStackType], [IndexedStackType])]
          allEffectsCombos = concat $
                 for allEffects $
-                (^.before) &&& (^.after) >>> TF.StackEffectParser.allEffects
+                (^._parsestateBefore) &&& (^._parsestateAfter) >>> TF.StackEffectParser.allEffects
 
 parseEffect :: String -> ParseStackEffectsConfig -> Script' ParseEffectResult
 parseEffect t conf = parseEffectTemplate t conf parseStackEffects

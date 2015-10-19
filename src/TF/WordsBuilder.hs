@@ -76,24 +76,24 @@ addInfo (EFFECT e c) = do
 
   shouldDoDynTransform <- view allCoreDynamic
   let effects'' = if shouldDoDynTransform then
-                    ((effects' & traverse.before.traverse._1 %~ setBaseType Dynamic
-                             & traverse.after.traverse._1 %~ setBaseType Dynamic) :: [StackEffect])
-                             & traverse.streamArgs.traverse._Defining.argType._Just._1 %~ setBaseType Dynamic
+                    ((effects' & traverse._before.traverse._1 %~ setBaseType Dynamic
+                             & traverse._after.traverse._1 %~ setBaseType Dynamic) :: [StackEffect])
+                             & traverse._streamArgs.traverse._Defining._argType._Just._1 %~ setBaseType Dynamic
                   else
                     effects'
   effects''' <- addTypeIndices effects''
-  setSemantics' (_Sem.effectsOfStack._Wrapped) effects'''
+  setSemantics' (_Sem._semEffectsOfStack._Wrapped) effects'''
   c
 
 addInfo (END) = return ()
 
 addInfo (DESCRIPTION d' c) = do
-  setSemantics' (_Sem.(FT.description)) d'
+  setSemantics' (_Sem._semDescription) d'
   c
 
 addInfo (NAME n' c) = word.name .= n'  >> c
 addInfo (ENTER s c) = do
-  setSemantics' (_Sem.enter) (Just s)
+  setSemantics' (_Sem._semEnter) (Just s)
   c
 
 addInfo (IMMEDIATE c) = word.isImmediate .= True  >> c

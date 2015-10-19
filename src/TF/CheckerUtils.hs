@@ -25,8 +25,8 @@ import TF.Type.StackEffect
 import TF.Type.Nodes
 
   
-forceBeforesEmpty effs = forceEmpty before effs "Before"
-forceAftersEmpty effs = forceEmpty after effs "After"
+forceBeforesEmpty effs = forceEmpty _before effs "Before"
+forceAftersEmpty effs = forceEmpty _after effs "After"
 
 forceEmpty l effs lName colonName = do
   let allEmpty :: Bool
@@ -131,7 +131,7 @@ effectsOfState = do
 replaceWrappers :: [StackEffect] -> CheckerM [StackEffect]
 replaceWrappers result = do 
   let wwrappersOfEff :: StackEffect -> [Int]
-      wwrappersOfEff eff = toListOf (before.wrapperLens._2._Just) eff ++ toListOf (after.wrapperLens._2._Just) eff
+      wwrappersOfEff eff = toListOf (_before.wrapperLens._2._Just) eff ++ toListOf (_after.wrapperLens._2._Just) eff
 
       wrapperLens = traverse.filtered (\(t,_) -> baseType t == WildcardWrapper)
   let wrapperIndices = concatMap wwrappersOfEff result
@@ -141,7 +141,7 @@ replaceWrappers result = do
     return (i, uniqueId)
 
   let changeWrappersToUnknown :: StackEffect -> StackEffect
-      changeWrappersToUnknown eff = eff & before.wrapperLens %~ replaceWrapper & after.wrapperLens %~ replaceWrapper
+      changeWrappersToUnknown eff = eff & _before.wrapperLens %~ replaceWrapper & _after.wrapperLens %~ replaceWrapper
       replaceWrapper (_, Nothing) = error "index of wildcardwrapper is always a just!"
       replaceWrapper (t, Just i) =
         let id = lookup i replacements
@@ -204,8 +204,8 @@ effectMatches' :: (StackEffect, Intersections) -> (StackEffect, Intersections) -
 effectMatches' (eff1, int1) (eff2, int2) = handling _TypeClash (const $ return False) $ withEmpty''' $ do
 -- effectMatches' (eff1, int1) (eff2, int2) = withEmpty' $ do
 -- effectMatches' (eff1, int1) (eff2, int2)  = _hand $ withEmpty' $ do
-  let before' = StackEffect [] [] (eff1 ^. before)
-      after' = StackEffect (eff1 ^. after) [] []
+  let before' = StackEffect [] [] (eff1 ^. _before)
+      after' = StackEffect (eff1 ^. _after) [] []
   checkEffects <- view _2 
   lift $ (`runReaderT` defCheckEffectsConfig) $ do
     checkEffects $ withIntersect int1 [(before', StackEffect [] [] [])]
@@ -227,7 +227,7 @@ effectMatches' (eff1, int1) (eff2, int2) = handling _TypeClash (const $ return F
   -- mapM (iop . show) (constraints eff2)
 
   
-  return $ (all (`elem` constraints eff2) $ constraints eff1) &&  ((==0) . length . filter (not . (\eff -> eff ^. before == [] && eff ^. after == [])) $ eff)
+  return $ (all (`elem` constraints eff2) $ constraints eff1) &&  ((==0) . length . filter (not . (\eff -> eff ^. _before == [] && eff ^. _after == [])) $ eff)
 
 showEffects = unlines . map (render . P.stackEffectNice . fst)
 
@@ -257,8 +257,8 @@ showEff =  iop . render . P.stackEffect
 
 effectMatches :: StackEffect -> StackEffect -> CheckerM' Bool
 effectMatches eff1 eff2 = handling _TypeClash (const $ return False) $ withEmpty''' $ do
-  let before' = StackEffect [] [] (eff1 ^. before)
-      after' = StackEffect (eff1 ^. after) [] []
+  let before' = StackEffect [] [] (eff1 ^. _before)
+      after' = StackEffect (eff1 ^. _after) [] []
   checkEffects' <- view _2 :: CheckerM' CheckEffectsT
   lift $ (`runReaderT` defCheckEffectsConfig) $ do
     checkEffects' $ withoutIntersect [(before', StackEffect [] [] [])]
@@ -278,4 +278,4 @@ effectMatches eff1 eff2 = handling _TypeClash (const $ return False) $ withEmpty
   mapM (iop . show) (constraints eff1)
   iop $ "constraints eff2"
   mapM (iop . show) (constraints eff2)
-  return $ (all (`elem` constraints eff2) $ constraints eff1) &&  ((==0) . length . filter (not . (\eff -> eff ^. before == [] && eff ^. after == [])) $ eff)
+  return $ (all (`elem` constraints eff2) $ constraints eff1) &&  ((==0) . length . filter (not . (\eff -> eff ^. _before == [] && eff ^. _after == [])) $ eff)

@@ -71,7 +71,7 @@ instance HasStackEffects Expr where
                         Nothing -> return result
                         Just doesEffects -> do
                           -- let newCreating = create & (elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0).runtimeEffect ?~ _RuntimeNotProcessed # (doesEffects & traverse.both %~ (\(StackEffect x y z) -> (x,y,z)))
-                          let newCreating = create & elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0.runtimeEffect ?~ doesEffects
+                          let newCreating = create & elementOf (_ForthWord.l.traverse._streamArgs.traverse._Defining) 0._runtimeEffect ?~ doesEffects
                           go (newCreating, exprs, comma, Nothing)
 
 
@@ -87,7 +87,7 @@ instance HasStackEffects Expr where
         lift $ checkNodes exprs
         stEffs <- lift $ effectsOfState
         let typeOfCreated :: Maybe IndexedStackType
-            typeOfCreated = stEffs ^?! _head & preview (after._head)
+            typeOfCreated = stEffs ^?! _head & preview (_after._head)
 
         -- when (typeOfCreated == Nothing) $ iop "UNGLEICH NOTHING"
 
@@ -97,12 +97,12 @@ instance HasStackEffects Expr where
         effs <- lift effectsOfState
         -- iopC "Current State:\n"
         -- liftIO $ mapM_ (putStrLn . render . P.stackEffect) effs
-        maybe (liftUp . lift  $ preview (_head.before._head) effs E.?? (_Impossible # "No top stack value in maybeInitType")) return typeOfCreated) :: CheckerM (Maybe IndexedStackType)
+        maybe (liftUp . lift  $ preview (_head._before._head) effs E.?? (_Impossible # "No top stack value in maybeInitType")) return typeOfCreated) :: CheckerM (Maybe IndexedStackType)
 
       result <- case maybeInitType of
                     Nothing -> go (create, [], Nothing, does)
                     Just initType -> do
-                      let newCreating = create & elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0.argType ?~ initType
+                      let newCreating = create & elementOf (_ForthWord.l.traverse._streamArgs.traverse._Defining) 0._argType ?~ initType
                       go (newCreating, init ^?! _Just._1, init ^? _Just._2, does)
 
       effs <- effectsOfState
@@ -129,20 +129,20 @@ instance HasStackEffects Expr where
   getStackEffects (Tick effects pw) = do
     unless (length effects == 1) $ throwing (_ErrorTick . _MultipleEffects) () 
     let effect = effects ^?! _head
-    when (has (before._head) effect) $ throwing (_ErrorTick . _MalformedAssert) "No before allowed!"
-    when (has (after._head) effect) $ throwing (_ErrorTick . _MalformedAssert) "No After allowed!"
-    let args = toListOf (streamArgs.traverse._NotDefining.runtimeSpecified._Just._KnownR) effect
+    when (has (_before._head) effect) $ throwing (_ErrorTick . _MalformedAssert) "No before allowed!"
+    when (has (_after._head) effect) $ throwing (_ErrorTick . _MalformedAssert) "No After allowed!"
+    let args = toListOf (_streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._KnownR) effect
     unless (1 == length args) $ throwing (_ErrorTick . _MalformedAssert) "Exactly one knownR stream argument necessary!"
 
     let runtimeEff'' = args ^?! _head -- .stackEffectIso
 
-    let pw' = pw & stacksEffects._CompiledEff._Wrapped.traverse.streamArgs.traverse._NotDefining.runtimeSpecified._Just %~ setEffect
+    let pw' = pw & stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just %~ setEffect
         setEffect :: RuntimeSpecification -> RuntimeSpecification
         setEffect = \case
           UnknownR i -> ResolvedR i runtimeEff''-- (effect ^. from stackEffectIso)
           x          -> x
-    let resolvedRuntimes = pw' ^.. stacksEffects._CompiledEff._Wrapped.traverse.streamArgs.traverse._NotDefining.runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
-        pw'' = pw' & stacksEffects._CompiledEff._Wrapped.traverse %~ ((before.traverse %~ resolveRuntimeType resolvedRuntimes) . (after.traverse %~ resolveRuntimeType resolvedRuntimes))
+    let resolvedRuntimes = pw' ^.. stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
+        pw'' = pw' & stacksEffects._CompiledEff._Wrapped.traverse %~ ((_before.traverse %~ resolveRuntimeType resolvedRuntimes) . (_after.traverse %~ resolveRuntimeType resolvedRuntimes))
 
     getStackEffects (KnownWord pw'')
 
@@ -151,20 +151,20 @@ instance HasStackEffects Expr where
     let effects = effects' ^. chosen
     unless (length effects == 1) $ throwing (_ErrorE . _MultipleEffects) () 
     let effect = effects ^?! _head
-    when (has (before._head) effect) $ throwing (_ErrorE . _MalformedAssert) "No before allowed!"
-    unless (1 == length (view after effect)) $ throwing (_ErrorE . _MalformedAssert) "Exactly One After data type!"
-    let xts = toListOf (after.traverse._1._NoReference._ExecutionType.runtimeSpecified._Just._KnownR) effect
+    when (has (_before._head) effect) $ throwing (_ErrorE . _MalformedAssert) "No before allowed!"
+    unless (1 == length (view _after effect)) $ throwing (_ErrorE . _MalformedAssert) "Exactly One After data type!"
+    let xts = toListOf (_after.traverse._1._NoReference._ExecutionType._exectokenRuntimeSpecified._Just._KnownR) effect
     unless (1 == length xts) $ throwing (_ErrorE . _MalformedAssert) "Exactly one xt data type!"
 
     let eff = xts ^?! _head
 
-    let compOrExec = if has _Compiled effects' then (_Compiled #) else (_Executed #)
+    let compOrExec = if has _Compiled effects' then Left else Right
 
     collectEffects <- view _3
-    lift $ collectEffects (_Expr # Assert effects' False) -- TODO take forced from parsed assertion
+    lift $ collectEffects (Expr $ Assert effects' False) -- TODO take forced from parsed assertion
 
     uniqueIdentifier <- lift $ identifier <<+= 1
-    let executeEffs = effsAsTuples $ compOrExec [eff & before %~ ((Wildcard, Just uniqueIdentifier):)] 
+    let executeEffs = effsAsTuples $ compOrExec [eff & _before %~ ((Wildcard, Just uniqueIdentifier):)] 
 
     return $ withoutIntersect $ executeEffs
 
@@ -175,25 +175,25 @@ instance HasStackEffects Expr where
 
   getStackEffects (Assert effs forced) = do
     let beforeToAfter :: StackEffect -> StackEffect
-        beforeToAfter eff = eff & before .~ (eff ^. after)
+        beforeToAfter eff = eff & _before .~ (eff ^. _after)
         effs' = bimap (map beforeToAfter) (map beforeToAfter) effs
 
     -- iopC "assert-effekts"
     -- mapM (iopC . render . P.stackEffect) (effs' ^. chosen)
 
-    when (has (chosen.traverse.before._head) effs) $ throwing _MalformedAssert "No before arguments allowed"
-    when (has (chosen.traverse.streamArgs.traverse._Defining) effs) $ throwing _MalformedAssert "No defining arguments allowed!"
-    when (has (chosen.traverse.streamArgs.traverse._NotDefining.runtimeSpecified._Nothing) effs) $ throwing _MalformedAssert "Runtime Specification is Nothing!"
-    when (has (chosen.traverse.streamArgs.traverse._NotDefining.runtimeSpecified._Just._UnknownR) effs) $ throwing _MalformedAssert "Runtime Specification is UnknownR!"
-    when (has (chosen.traverse.streamArgs.traverse._NotDefining.runtimeSpecified._Just._NoR) effs) $ throwing _MalformedAssert "Runtime Specification is NoR!"
-    when (has (chosen.traverse.streamArgs.traverse._NotDefining.runtimeSpecified._Just._ResolvedR) effs) $ throwing _MalformedAssert "Runtime Specification is ResolvedR!"
+    when (has (chosen.traverse._before._head) effs) $ throwing _MalformedAssert "No before arguments allowed"
+    when (has (chosen.traverse._streamArgs.traverse._Defining) effs) $ throwing _MalformedAssert "No defining arguments allowed!"
+    when (has (chosen.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Nothing) effs) $ throwing _MalformedAssert "Runtime Specification is Nothing!"
+    when (has (chosen.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._UnknownR) effs) $ throwing _MalformedAssert "Runtime Specification is UnknownR!"
+    when (has (chosen.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._NoR) effs) $ throwing _MalformedAssert "Runtime Specification is NoR!"
+    when (has (chosen.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR) effs) $ throwing _MalformedAssert "Runtime Specification is ResolvedR!"
 
     return $ withoutIntersect $ effsAsTuples effs'
 
   getStackEffects (ColonExprClash n stackCommentEffects) = do
     let isForced = has (_Just._2.only True) stackCommentEffects
     when isForced $ do
-       let effs = (stackCommentEffects & view (_Just._1.effectsOfStack._Wrapped))
+       let effs = (stackCommentEffects & view (_Just._1._semEffectsOfStack._Wrapped))
        lift $ exportColonDefinition isForced n effs False
     return emptyForthEffect
 
@@ -216,7 +216,7 @@ instance HasStackEffects Expr where
     lift $ depth += 1
     checkNodes <- view _1
     (effs, compI) <- if isForced then
-             return ((stackCommentEffects & view (_Just._1.effectsOfStack._Wrapped)), False)
+             return ((stackCommentEffects & view (_Just._1._semEffectsOfStack._Wrapped)), False)
             else (do
               (ForthEffect (compExecEffects, Intersections compI execI )) <- withEmpty' $ checkNodes bodyWords
 
@@ -228,7 +228,7 @@ instance HasStackEffects Expr where
 
               -- effs <- liftM (view chosen) . runEitherT  $ do
               effs <- (`runContT` return) $ callCC $ \ret -> do
-                let stEffs' = view (_1.effectsOfStack._Wrapped) <$> stackCommentEffects
+                let stEffs' = view (_1._semEffectsOfStack._Wrapped) <$> stackCommentEffects
                 when (isNothing stEffs') $ ret compColonEffects
 
                 let specifiedEffs = stEffs' ^?! _Just

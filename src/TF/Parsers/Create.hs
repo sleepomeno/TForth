@@ -35,11 +35,11 @@ parseCreating = do
          modifyState (set stateVar newState)
 
          -- iopP $ render . P.forthWord $ forthWord
-         unless (is _DefE forthWord) $ fail "not a defE"
+         unless (has _DefE forthWord) $ fail "not a defE"
 
          let (_, effs) = forthWord ^?! (_DefE.chosen)
          let defArg :: Maybe DefiningArg
-             defArg = preview (_head.streamArgs.traverse._Defining) effs
+             defArg = preview (_head._streamArgs.traverse._Defining) effs
 
          when (isNothing defArg) $ fail "no defining args"
          -- iopP $ "after eval"
@@ -51,7 +51,7 @@ parseCreating = do
         pw <- parseWordCreate
         let effs = toListOf (stacksEffects._CompiledEff._Wrapped.traverse) pw  ++ (toListOf (stacksEffects._ExecutedEff._Wrapped.traverse) pw)
             defArg :: Maybe DefiningArg
-            defArg = preview (_head.streamArgs.traverse._Defining) effs
+            defArg = preview (_head._streamArgs.traverse._Defining) effs
 
 
         return (KnownWord pw, defArg ^?! _Just)
@@ -74,7 +74,7 @@ parseCreating = do
   maybeDoes <- lift $ withEmpty $ optionMaybe $ (`runReaderT` env) parseDoes
 
   -- let createExpr = Create (new _ForthWord creatingWord) maybeInitialization maybeDoes
-  let createExpr = Create (new _ForthWord creatingWord) maybeInitialization maybeDoes
+  let createExpr = Create (ForthWord creatingWord) maybeInitialization maybeDoes
   iop $ "Out create"
   return createExpr
 
@@ -87,9 +87,9 @@ parseDoes = do
 parseStoringValue  = do
   forbidden' <- forbiddenInBranch
   coreWords <- lift $ use wordsMap
-  let commaDoes = mapMaybe (\w -> M.lookup (new _WordIdentifier w) coreWords) [",",  "does>"]
+  let commaDoes = mapMaybe (\w -> M.lookup (Left w) coreWords) [",",  "does>"]
   let forbidden = commaDoes ++ forbidden'
   parseNodeWithout <- view parseNodeWithout'
   parseWord <- view parseWord'
   env <- ask
-  handling _UnknownWord (lift . unexpected) $ lift $ withEmpty $ (,) <$> many (parseNodeWithout forbidden) <*> ((new _ForthWord . KnownWord) <$> parseWord ",")
+  handling _UnknownWord (lift . unexpected) $ lift $ withEmpty $ (,) <$> many (parseNodeWithout forbidden) <*> ((ForthWord . KnownWord) <$> parseWord ",")

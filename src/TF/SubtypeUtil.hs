@@ -25,11 +25,11 @@ isSubtypeOf t1 t2 = do
         baseType2 = baseType t2
         -- bothNotWildcard = has _NoReference baseType1 && has _NoReference baseType2
         -- subtypeOfWildcard = ((not (has _Wildcard baseType1) && has _Wildcard baseType2)) || ((not (has _WildcardWrapper baseType1) && has _WildcardWrapper baseType2)) || (has _Wildcard baseType1 && has _Wildcard baseType2) || (has _Dynamic baseType1 || has _Dynamic baseType2 || has (_NoReference._PrimType.symbol.only DYN) baseType1 || has (_NoReference._PrimType.symbol.only DYN) baseType2)
-        subtypeOfWildcard = ((not (has _Wildcard baseType1) && has _Wildcard baseType2)) || ((not (has _WildcardWrapper baseType1) && has _WildcardWrapper baseType2)) || (has _Wildcard baseType1 && has _Wildcard baseType2) || (has _Dynamic baseType1 || has _Dynamic baseType2 || has (_NoReference._PrimType.symbol.only DYN) baseType1 || has (_NoReference._PrimType.symbol.only DYN) baseType2)
+        subtypeOfWildcard = ((not (has _Wildcard baseType1) && has _Wildcard baseType2)) || ((not (has _WildcardWrapper baseType1) && has _WildcardWrapper baseType2)) || (has _Wildcard baseType1 && has _Wildcard baseType2) || (has _Dynamic baseType1 || has _Dynamic baseType2 || has (_NoReference._PrimType._primtypeSymbol.only DYN) baseType1 || has (_NoReference._PrimType._primtypeSymbol.only DYN) baseType2)
         subtypeOfXT :: Bool
         subtypeOfXT = fromMaybe False $ do
-          r1 <- baseType1  ^? _NoReference._ExecutionType.runtimeSpecified._Just
-          r2 <- baseType2 ^? _NoReference._ExecutionType.runtimeSpecified._Just
+          r1 <- baseType1  ^? _NoReference._ExecutionType._exectokenRuntimeSpecified._Just
+          r2 <- baseType2 ^? _NoReference._ExecutionType._exectokenRuntimeSpecified._Just
           r1' <- (r1 ^? _KnownR) `mplus` (r1 ^? _ResolvedR._2)
           r2' <- (r2 ^? _KnownR) `mplus` (r2 ^? _ResolvedR._2)
           return $ r1' == r2'
@@ -84,9 +84,9 @@ constraints stEff =
              typeIndex1 == typeIndex2,
              i /= i', typeIndex1 /= Nothing] 
    where
-     consuming = stEff ^. before
-     producing = stEff ^. after
-     streamArguments = stEff ^.. streamArgs.traverse._Defining.argType._Just
+     consuming = stEff ^. _before
+     producing = stEff ^. _after
+     streamArguments = stEff ^.. _streamArgs.traverse._Defining._argType._Just
      typeByPosition :: [(Int, IndexedStackType)]
      typeByPosition = zip [0..] (consuming ++ streamArguments ++ producing)
      
@@ -94,15 +94,15 @@ constraints stEff =
 
 effectIsSubtypeOf :: StackEffect -> StackEffect -> CheckerM Bool
 effectIsSubtypeOf eff1 eff2 =  (`runContT` id) $ callCC $ \exit -> do
-  let (before1, before2) = (view before *** view before) $ (eff1, eff2)
-      (after1, after2)   = (view after *** view after) $ (eff1, eff2)
-      (streamArgs1, streamArgs2)   = (view streamArgs *** view streamArgs) $ (eff1, eff2)
+  let (before1, before2) = (view _before *** view _before) $ (eff1, eff2)
+      (after1, after2)   = (view _after *** view _after) $ (eff1, eff2)
+      (streamArgs1, streamArgs2)   = (view _streamArgs *** view _streamArgs) $ (eff1, eff2)
       -- (allTypes1, allTypes2) = (allTypes *** allTypes) $ (eff1, eff2)
       sameLengths = (length before1 == length before2) && (length after1 == length after2) && (length streamArgs1 == length streamArgs2) -- && (length (allTypes1 ^. _1) == length (allTypes2 ^. _1)) && (length (allTypes2 ^. _2) == length (allTypes1 ^. _2))
       streamArgsSameKind = all (\(arg1,arg2) -> (has _NotDefining arg1 && has _NotDefining arg2) ||
-                                                (has (_Defining.argType._Just) arg1 && has (_Defining.argType._Just) arg2) ||
-                                                (has (_Defining.argType._Nothing) arg1 && has (_Defining.argType._Just) arg2) ||
-                                                (has (_Defining.argType._Nothing) arg1 && has (_Defining.argType._Nothing) arg2)) $ zip streamArgs1 streamArgs2 :: Bool
+                                                (has (_Defining._argType._Just) arg1 && has (_Defining._argType._Just) arg2) ||
+                                                (has (_Defining._argType._Nothing) arg1 && has (_Defining._argType._Just) arg2) ||
+                                                (has (_Defining._argType._Nothing) arg1 && has (_Defining._argType._Nothing) arg2)) $ zip streamArgs1 streamArgs2 :: Bool
 
 
   -- iop "before argskind"

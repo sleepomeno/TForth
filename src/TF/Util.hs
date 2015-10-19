@@ -103,7 +103,7 @@ resolveRuntimeType resolvedRuntimes (t, i') = (setBaseType newType t, i')
   where
     newType = case baseType t of
       NoReference t' -> NoReference $ (case t' of
-        exec@(ExecutionType execToken) -> ExecutionType $ execToken & runtimeSpecified._Just %~ (\case
+        exec@(ExecutionType execToken) -> ExecutionType $ execToken & _exectokenRuntimeSpecified._Just %~ (\case
           UnknownR i -> (case (lookup i resolvedRuntimes) of
               Just eff -> ResolvedR i eff
               Nothing  -> UnknownR i)

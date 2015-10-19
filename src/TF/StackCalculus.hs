@@ -22,10 +22,10 @@ import TF.Type.Nodes
 applyRule1 :: (StackEffect, StackEffect) -> MaybeT StackRuleM StackEffect
 applyRule1 (stE1,stE2) = do
   -- iop $ "will 1 be applied?"
-  let b = null $ stE1 ^. after -- views after null stE1
+  let b = null $ stE1 ^. _after -- views after null stE1
   forcedAssertion <- view isForcedAssertion
 
-  when (b && forcedAssertion && (not . null $ stE2 ^. before)) $
+  when (b && forcedAssertion && (not . null $ stE2 ^. _before)) $
     void typeClash
 
   assert b
@@ -37,11 +37,11 @@ applyRule1 (stE1,stE2) = do
 
   iop "Rule 1 will be applied"
   -- Rule 1 is applicable if @after@ of state is empty
-  let beforeTypes2 = stE2 ^. before 
-      toTypes2 = stE2 ^. after 
+  let beforeTypes2 = stE2 ^. _before 
+      toTypes2 = stE2 ^. _after 
   
-  return $ stE1 &~ before %= (++ beforeTypes2) &~ after .= toTypes2
-           &~ streamArgs %= (++ view streamArgs stE2) & streamArgs %~ resolveArgs
+  return $ stE1 &~ _before %= (++ beforeTypes2) &~ _after .= toTypes2
+           &~ _streamArgs %= (++ view _streamArgs stE2) & _streamArgs %~ resolveArgs
 
 resolveArgs :: [DefiningOrNot] -> [DefiningOrNot]
 resolveArgs  = id -- filter (either (view resolved >>> isNothing) (view resolved >>> isNothing)) 
@@ -50,9 +50,9 @@ resolveArgs  = id -- filter (either (view resolved >>> isNothing) (view resolved
 applyRule2 :: (StackEffect, StackEffect) -> MaybeT StackRuleM StackEffect
 applyRule2 (stE1,stE2) = do
   -- iop $ "will 2 be applied?"
-  let before2 = stE2 ^. before 
-      after2 = stE2 ^. after 
-      after1 = stE1 ^. after 
+  let before2 = stE2 ^. _before 
+      after2 = stE2 ^. _after 
+      after1 = stE1 ^. _after 
   forcedAssertion <- view isForcedAssertion
 
   when (null before2 && forcedAssertion && (not . null $ after1)) $
@@ -61,7 +61,7 @@ applyRule2 (stE1,stE2) = do
   assert $ null before2
   iop "Rule 2 will be applied"
   -- Rule 2 is applicable if @before@ of the word is empty
-  return $ stE1 &~ after %= (after2 ++) &~ streamArgs %= (++ view streamArgs stE2) & streamArgs %~ resolveArgs
+  return $ stE1 &~ _after %= (after2 ++) &~ _streamArgs %= (++ view _streamArgs stE2) & _streamArgs %~ resolveArgs
 
 ---- Rule 3 ------
 applyRule3 :: (StackEffect, StackEffect) -> MaybeT StackRuleM StackEffect
@@ -69,8 +69,8 @@ applyRule3 (stE1, stE2) = do
     -- iop $ "will 3 be applied?"
     
     
-    (topOfStack,_) <- hoistMaybe $ preview (after.traverse) stE1
-    (topOfArgs,_)  <- hoistMaybe $ preview (before.traverse) stE2
+    (topOfStack,_) <- hoistMaybe $ preview (_after.traverse) stE1
+    (topOfArgs,_)  <- hoistMaybe $ preview (_before.traverse) stE2
     typesMatch <- lift $ lift $ lift $ topOfStack `isSubtypeOf` topOfArgs
     assert (not typesMatch)
     iop  "Rule 3 will beapplied"
@@ -87,8 +87,8 @@ applyRule4 stE1 stE2 = chosen' $ applyRule4' stE1 stE2
      applyRule4' stE1 stE2 = do
         -- iop $ "will 4 be applied?"
 
-        tS@(topOfStack,_) <- firstOf (after.traverse) stE1 ?? (stE1, stE2)
-        tA@(topOfArgs,_)  <- firstOf (before.traverse) stE2 ?? (stE1, stE2)
+        tS@(topOfStack,_) <- firstOf (_after.traverse) stE1 ?? (stE1, stE2)
+        tA@(topOfArgs,_)  <- firstOf (_before.traverse) stE2 ?? (stE1, stE2)
         dataType' <- lift $ topOfStack `isSubtypeOf` topOfArgs
         -- dataType <- hoistEither . note (stE1, stE2) $ dataType'
         hoistEither $ (if dataType' then Right else Left) (stE1, stE2)
@@ -97,7 +97,7 @@ applyRule4 stE1 stE2 = chosen' $ applyRule4' stE1 stE2
         iop $ render $ P.dataType tS
         iop $ render $ P.dataType tA
 
-        hoistEither $ Left (stE1 & after %~ tail, stE2 & before %~ tail)
+        hoistEither $ Left (stE1 & _after %~ tail, stE2 & _before %~ tail)
 
 
 -- shows how a inner maybet which should be null is lifted upwards to

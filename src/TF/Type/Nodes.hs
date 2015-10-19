@@ -5,11 +5,12 @@ module TF.Type.Nodes where
 import qualified Data.Text as Te
 import TF.TH
 import TF.ForthTypes
-import  Control.Lens hiding (makeFields)
+import  Control.Lens (makeWrapped)
 import TF.Type.StackEffect
 import Lens.Family.Total (Empty)
 import GHC.Generics (Generic)
 import           Data.Data hiding (DataType)
+import Lens.Simple 
 -- import TF.Type.Expressions.Expr (Expr(..))
 -- import TF.Type.Expressions.OOP (OOPExpr(..))
 
@@ -24,7 +25,7 @@ newtype Unknown = Unknown {
                      _unknownName :: String
                   } deriving (Show, Eq)
 data Threes a b c = One'  a | Two' b |  Three' c  deriving (Show, Eq, Generic)
-makePrisms ''Threes
+makeTraversals ''Threes
 
 type CompiledExecutedOrBoth a = Threes a a (a,a)
 instance (Empty a, Empty b, Empty c) => Empty (Threes a b c)
@@ -39,9 +40,9 @@ _CompAndExecutedEff = _Three'
                       
 data SemState = INTERPRETSTATE | COMPILESTATE deriving (Show, Eq)
 data Semantics = Semantics {
-                     _semDescription :: String
-                   , _semEnter :: Maybe SemState
-                   , _semEffectsOfStack:: MultiStackEffect
+                     semDescription :: String
+                   , semEnter :: Maybe SemState
+                   , semEffectsOfStack:: MultiStackEffect
                       } deriving (Show, Eq)
              
 data Intersections = Intersections {
@@ -127,12 +128,12 @@ makeFields ''ParsedWord
 makeWrapped ''Unknown
 makeFields ''Unknown
 
-makeFields ''Semantics
-makePrisms ''ForthWord
-makePrisms ''Expr
-makePrisms ''Node
+makeLens ''Semantics
+makeTraversals ''ForthWord
+makeTraversals ''Expr
+makeTraversals ''Node
 
-makePrisms ''OOMethodSem
-makePrisms ''OOFieldSem'
+makeTraversals ''OOMethodSem
+makeTraversals ''OOFieldSem'
 
 makeFields ''Intersections

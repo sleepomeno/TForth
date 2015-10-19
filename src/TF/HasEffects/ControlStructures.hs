@@ -29,12 +29,12 @@ getStackEffects' (IfElseExpr thens elses) = do
     (thenEff, isThenIntersect) <- lift $ withEmpty $ do
       (ForthEffect (thenEffs, isThenIntersect)) <- checkNodes thens
       flag' <- flag''
-      let result = thenEffs & traverse._1.before %~ (flag':)
+      let result = thenEffs & traverse._1._before %~ (flag':)
       return (result, isThenIntersect) 
     (elseEff, isElseIntersect) <- lift $ withEmpty $ do
       (ForthEffect (elseEffs, isElseIntersect)) <- checkNodes elses
       flag' <- flag''
-      let result = elseEffs & traverse._1.before %~ (flag':)
+      let result = elseEffs & traverse._1._before %~ (flag':)
       return (result, isElseIntersect)
     -- lift $ depth -= 1
 
@@ -86,7 +86,7 @@ getStackEffects' (IfExpr forthWordsOrExprs) = do
                      withoutIntersect' ((emptySt, emptySt) : effs)
 
       flag' <- lift flag''
-      return $ ForthEffect $ result & _1.traverse._1.before %~ (flag':)
+      return $ ForthEffect $ result & _1.traverse._1._before %~ (flag':)
 
     iop "if culprits"
     -- showEffs $ res ^. _1
@@ -102,13 +102,13 @@ getStackEffects' (BeginUntil tokens) = do
 
     where
      removeLastFlag eff effects = (`runContT` return) $ callCC $ \ret -> do
-      lift $ when (eff & view (after.to length) & (/=1)) $ throwing _BeginUntilNoFlag (showEffects effects)
-      -- lift $ iopC $ "last datatype is: " <> (show $ eff ^.. after._head._1)
+      lift $ when (eff & view (_after.to length) & (/=1)) $ throwing _BeginUntilNoFlag (showEffects effects)
+      -- lift $ iopC $ "last datatype is: " <> (show $ eff ^.. _after._head._1)
       lift $ unlessM (lastDatatypeIsFlag eff) $ throwing _BeginUntilNoFlag (showEffects effects)
-      return $ eff & after %~ tail
+      return $ eff & _after %~ tail
 
 
      lastDatatypeIsFlag eff = fmap (has $ _Just.only True) . runMaybeT $ do
-       let mLastType = eff ^? (after._head._1)
+       let mLastType = eff ^? (_after._head._1)
        lastType <- hoistMaybe mLastType
        lift $ lastType `isSubtypeOf` (NoReference $ PrimType flag)
