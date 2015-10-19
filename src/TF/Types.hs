@@ -54,14 +54,6 @@ _RuntimeNotProcessed = _Right
 _UnknownRuntimeSpecification = _Left
 _KnownRuntimeSpecification = _Right
 
--- makePrisms ''DataType
--- makePrisms ''BasicType
--- makeFields ''DefiningArg
--- makeFields ''StreamArg
--- makePrisms ''RuntimeSpecification
--- makeFields ''ExecutionToken
-
-
 type ReferenceDegree = Int
 
 getIndex t = t ^. _2

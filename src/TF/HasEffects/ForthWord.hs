@@ -15,9 +15,9 @@ instance HasStackEffects ForthWord where
   getStackEffects (KnownWord pw)  = do
     -- pw ^. stacksEffects & adjustEffectsState
     let compExecEffect :: [StackEffectPair]
-        compExecEffect = pw ^. stacksEffects.to fromThree'
+        compExecEffect = pw ^. _stacksEffects.to fromThree'
     -- return $ zipWith3 StackEffect (beforeArgs dataStack pw) (repeat (streamArgsOfParsedWord pw)) (afterArgs dataStack pw)
-    return $ withIntersect (pw ^. intersections) compExecEffect
+    return $ withIntersect (pw ^. _intersectionsPW) compExecEffect
 
 
   getStackEffects (DefE x) = do
@@ -34,7 +34,7 @@ instance HasStackEffects ForthWord where
     return $ withoutIntersect effs
 
   getStackEffects (UnknownE uk) = do
-    let unknownName = view name uk
+    let unknownName = uk ^. _Wrapped
 
 
     -- s <- getState

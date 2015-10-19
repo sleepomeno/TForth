@@ -220,8 +220,8 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
   -- lift $ modifyState $ set effects validEffects
   lift $ modifyState $ effects._Wrapped._1 .~ validEffects
 
-  updateIntersectionType nrOfOldCompEffs nrOfNewCompEffs compileEffect oldCompileI newCompileI
-  updateIntersectionType nrOfOldExecEffs nrOfNewExecEffs execEffect oldExecI newExecI
+  updateIntersectionType nrOfOldCompEffs nrOfNewCompEffs _compileEffect oldCompileI newCompileI
+  updateIntersectionType nrOfOldExecEffs nrOfNewExecEffs _execEffect oldExecI newExecI
 
   return ()
 

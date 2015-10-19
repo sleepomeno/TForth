@@ -90,11 +90,11 @@ isKnownWord              = do
   possWord <- anyToken
   s        <- getState
   let maybeColonDefinition' :: Unknown -> Maybe ColonDefinitionProcessed
-      maybeColonDefinition' w'   = preview (definedWords'.at (w' ^. name)._Just._ColonDefinition) s
+      maybeColonDefinition' (Unknown unknownName)   = preview (definedWords'.at unknownName._Just._ColonDefinition) s
   -- maybeDefOrWord <- possWord & (_case & on _Unknown (\uk -> do 
   maybeDefOrWord <- case possWord of
-    UnknownToken uk -> do 
-        iopP $ uk ^. name
+    UnknownToken uk@(Unknown unknownName) -> do 
+        iopP $ unknownName
 
         runMaybeT $ do
         y <- hoistMaybe $ maybeColonDefinition' uk
@@ -125,9 +125,6 @@ parseStackEffectString = do
 
 type UnresolvedArgsM = StateT (M.Map Int UniqueArg) CheckerM 
   
--- newtype UnresolvedArgsTypesState = UnresolvedArgsTypesState (M.Map Int UniqueArg)  deriving (Show, Eq)
--- makeWrapped ''UnresolvedArgsTypesState
-
 prepareUnresolvedArgsTypes :: (Semantics, Bool) -> CheckerM (Semantics, Bool)
 prepareUnresolvedArgsTypes (sem, forced) = do
   -- effs <- (`evalStateT` UnresolvedArgsTypesState M.empty) $ forM (sem ^. (_semEffectsOfStack._Wrapped)) go

@@ -49,7 +49,7 @@ withTrace p = do
 parseKeyword :: String -> ExpressionsM ()
 parseKeyword keyword = do
   uk <- parseUnknownToken
-  guard $ (uk ^. name) == keyword
+  guard $ (uk ^. _Wrapped) == keyword
 
 
 parseWordPostpone = view parseWord' >>= \parseWord -> lift $ parseWord "postpone"
@@ -119,8 +119,8 @@ parseUnknownToken  = do
   lift parseUnknownToken'
 
 parseUnknownName = do
-  uk <- parseUnknownToken
-  return (uk ^. name)
+  (Unknown ukName) <- parseUnknownToken
+  return ukName
 
 forbiddenInBranch :: ExpressionsM [Word]
 forbiddenInBranch = do

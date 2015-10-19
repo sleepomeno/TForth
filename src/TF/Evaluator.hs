@@ -94,20 +94,20 @@ evalKnownWord w' = do
                            else 
                              maybe Two' (\runtime execSem -> Three' (view _semEffectsOfStack . reverseStacks' $ runtime, execSem)) runtimeSem
 
-  let newIntersect = if | state' == COMPILESTATE && compSem == APPEND_EXECUTION -> intersect & compileEffect .~ (intersect ^. execEffect)
+  let newIntersect = if | state' == COMPILESTATE && compSem == APPEND_EXECUTION -> intersect & _compileEffect .~ (intersect ^. _execEffect)
                         | isNothing runtimeSem -> intersect
                         | True -> intersect
 
-  let kw = ParsedWord {}
-           & name .~ view name w'
-           & parsed .~ view parsed w'
-           & stacksEffects .~ singleSemantics
-           & intersections .~ newIntersect
-           & enter .~ view _semEnter (fromJust sem)
+  let kw = ParsedWord (w' ^. parsed) (w' ^. name) singleSemantics (view _semEnter (fromJust sem)) newIntersect 
+           -- & name .~ view name w'
+           -- & parsed .~ view parsed w'
+           -- & stacksEffects .~ singleSemantics
+           -- & intersections .~ newIntersect
+           -- & enter .~ view _semEnter (fromJust sem)
 
   let args :: MaybeT (ParsecT [Token] ParseState StackEffectM) [DefiningOrNot]
-      args = hoistMaybe $ preview (stacksEffects._ExecutedEff._Wrapped._head._streamArgs) kw `mplus`
-                          preview (stacksEffects._CompAndExecutedEff._2._Wrapped._head._streamArgs) kw 
+      args = hoistMaybe $ preview (_stacksEffects._ExecutedEff._Wrapped._head._streamArgs) kw `mplus`
+                          preview (_stacksEffects._CompAndExecutedEff._2._Wrapped._head._streamArgs) kw 
       resolveArgs = do
           rFS <- view readFromStream
           guard rFS
@@ -115,7 +115,7 @@ evalKnownWord w' = do
           resolvedArgs <- lift $ resolveStreamArgs args' []
           let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
               -- return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse._after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
-          return $ kw & stacksEffects._ExecutedEff._Wrapped.traverse %~ ((_streamArgs .~ resolvedArgs) . (_before.traverse %~ resolveRuntimeType resolvedRuntimes) . (_after.traverse %~ resolveRuntimeType resolvedRuntimes))
+          return $ kw & _stacksEffects._ExecutedEff._Wrapped.traverse %~ ((_streamArgs .~ resolvedArgs) . (_before.traverse %~ resolveRuntimeType resolvedRuntimes) . (_after.traverse %~ resolveRuntimeType resolvedRuntimes))
 
   kw' <- runMaybeT resolveArgs
 
@@ -130,9 +130,9 @@ evalKnownWord w' = do
   
 
 maybeColonDefinition :: Unknown -> ParseState -> Maybe ColonDefinitionProcessed
-maybeColonDefinition w' s   = preview (definedWords'.at (w' ^. name)._Just._ColonDefinition) s-- & fmap (view _ColonDefinition)
+maybeColonDefinition w' s   = preview (definedWords'.at (w' ^. _Wrapped)._Just._ColonDefinition) s-- & fmap (view _ColonDefinition)
 -- maybeDefinition w' s   = view (definedWords'.at (w' ^. name)) s
-evalNonDefinition  =  UnknownE . Unknown . view name
+evalNonDefinition  =  UnknownE . Unknown . view _Wrapped
 
 evalColonDefinition :: ColonDefinitionProcessed -> CheckerM ForthWord
 evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
@@ -183,8 +183,7 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
   return $ DefE . compiledOrExecuted . (, effs') $ colonName
 
 evalCreatedWord :: Unknown -> MaybeT CheckerM (ForthWord, SemState)
-evalCreatedWord uk = do
-  let ukName = view name uk
+evalCreatedWord (Unknown ukName) = do
   parseState <- lift getState
   -- let maybeEffects = view (colonDefEffects.at ukName) parseState
   let maybeEffects :: Maybe [StackEffect]
@@ -253,10 +252,10 @@ handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR ind
       mapM_ (iopP . render. P.stackEffect) effs
       adjustHOT effs
     KnownWord pw -> do
-      when (has (stacksEffects._CompAndExecutedEff) pw) $
+      when (has (_stacksEffects._CompAndExecutedEff) pw) $
         throwing _StreamArgHasExecAndCompEffect ()
-      let effs =  view (stacksEffects._ExecutedEff._Wrapped) pw
-               ++ view (stacksEffects._CompiledEff._Wrapped) pw :: [StackEffect]
+      let effs =  view (_stacksEffects._ExecutedEff._Wrapped) pw
+               ++ view (_stacksEffects._CompiledEff._Wrapped) pw :: [StackEffect]
       adjustHOT effs
   where
     adjustHOT effs = do

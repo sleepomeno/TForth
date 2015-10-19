@@ -50,7 +50,7 @@ parseCreating = do
       parseCreate :: ExpressionsM (ForthWord, DefiningArg)
       parseCreate = do
         pw <- parseWordCreate
-        let effs = toListOf (stacksEffects._CompiledEff._Wrapped.traverse) pw  ++ (toListOf (stacksEffects._ExecutedEff._Wrapped.traverse) pw)
+        let effs = toListOf (_stacksEffects._CompiledEff._Wrapped.traverse) pw  ++ (toListOf (_stacksEffects._ExecutedEff._Wrapped.traverse) pw)
             defArg :: Maybe DefiningArg
             defArg = preview (_head._streamArgs.traverse._Defining) effs
 

@@ -43,29 +43,24 @@ data Semantics = Semantics {
                       } deriving (Show, Eq)
              
 data Intersections = Intersections {
-    _intersectCompileEffect :: Bool
-  , _intersectExecEffect :: Bool
+    compileEffect :: Bool
+  , execEffect :: Bool
   } deriving (Show,Eq)
+
 data ParsedWord = ParsedWord {
-                   _pwordParsed :: Parsable
-                 , _pwordName :: String
-                 , _pwordStacksEffects :: CompiledExecutedOrBoth MultiStackEffect
-                 , _pwordEnter :: Maybe SemState
-                 , _pwordIntersections :: Intersections
+                   parsedPW :: Parsable
+                 , namePW :: String
+                 , stacksEffects :: CompiledExecutedOrBoth MultiStackEffect
+                 , enter :: Maybe SemState
+                 , intersectionsPW :: Intersections
                   } deriving (Show, Eq)
+
 data ForthWord = UnknownE Unknown
                | DefE (CompiledOrExecuted (NameOfDefinition, [StackEffect]))
                | KnownWord ParsedWord
                deriving (Eq, Show)
 
-
-
-
-
 data Node = ForthWord ForthWord | Expr Expr deriving Show
-
-
-
 
 data ControlStructure = IfExpr [Node]
                       | IfElseExpr [Node] [Node]
@@ -119,12 +114,9 @@ data OOPExpr = Class ClassName [(Variable, OOFieldSem)] [(Method, OOMethodSem)] 
                                                      
 
 
--- makeFields ''StackEffect
 makeWrapped ''MultiStackEffect
-makeFields ''ParsedWord
+makeLens ''ParsedWord
 makeWrapped ''Unknown
-makeFields ''Unknown
-
 makeLens ''Semantics
 makeTraversals ''ForthWord
 makeTraversals ''Expr
@@ -135,4 +127,4 @@ makeTraversals ''OOFieldSem'
 makeTraversals ''Parsable
 makeTraversals ''CompiledOrExecuted
 
-makeFields ''Intersections
+makeLens ''Intersections

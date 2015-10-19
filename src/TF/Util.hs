@@ -133,7 +133,7 @@ getNextParameter = do
   return . possWordAsString $ w
 
 possWordAsString :: Token -> String
-possWordAsString = either (view name) (Te.unpack . view (parsed._WordIdentifier)) . view tokenIso
+possWordAsString = either (view _Wrapped) (Te.unpack . view (parsed._WordIdentifier)) . view tokenIso
 
 parseUnknown :: String -> CheckerM Unknown
 parseUnknown n = do

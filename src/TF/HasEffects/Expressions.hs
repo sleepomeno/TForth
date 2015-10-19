@@ -117,7 +117,7 @@ instance HasStackEffects Expr where
        l = if has (_ForthWord._DefE) create then
              _DefE.chosen'._2
            else
-             _KnownWord.stacksEffects.chosen''._Wrapped
+             _KnownWord._stacksEffects.chosen''._Wrapped
 
     -- iopC "Show effects of create:\n"
     -- liftIO $ mapM_ (putStrLn . render . P.stackEffect) effs
@@ -138,13 +138,13 @@ instance HasStackEffects Expr where
 
     let runtimeEff'' = args ^?! _head -- .stackEffectIso
 
-    let pw' = pw & stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just %~ setEffect
+    let pw' = pw & _stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just %~ setEffect
         setEffect :: RuntimeSpecification -> RuntimeSpecification
         setEffect = \case
           UnknownR i -> ResolvedR i runtimeEff''-- (effect ^. from stackEffectIso)
           x          -> x
-    let resolvedRuntimes = pw' ^.. stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
-        pw'' = pw' & stacksEffects._CompiledEff._Wrapped.traverse %~ ((_before.traverse %~ resolveRuntimeType resolvedRuntimes) . (_after.traverse %~ resolveRuntimeType resolvedRuntimes))
+    let resolvedRuntimes = pw' ^.. _stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
+        pw'' = pw' & _stacksEffects._CompiledEff._Wrapped.traverse %~ ((_before.traverse %~ resolveRuntimeType resolvedRuntimes) . (_after.traverse %~ resolveRuntimeType resolvedRuntimes))
 
     getStackEffects (KnownWord pw'')
 

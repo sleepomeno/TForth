@@ -57,7 +57,7 @@ parseTick = do
   pw <- parseWordTick -- TODO take a tick-like word
 
   guard $ has (_Assert._1._Compiled) assert'
-  guard $ has (stacksEffects._CompiledEff) pw -- TODO _Compiled Or _compiledandexecuted
+  guard $ has (_stacksEffects._CompiledEff) pw -- TODO _Compiled Or _compiledandexecuted
 
   iop $ "-------- TICK --------"
   

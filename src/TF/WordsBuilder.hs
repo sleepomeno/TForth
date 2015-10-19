@@ -70,9 +70,9 @@ addInfo (EFFECT e c) = do
       isIntersect = view isIntersection parseResult
   st' <- use state
   if st' == EXECUTION then
-    word.intersections.execEffect .= isIntersect
+    word.intersections._execEffect .= isIntersect
   else
-    word.intersections.compileEffect .= isIntersect
+    word.intersections._compileEffect .= isIntersect
 
   shouldDoDynTransform <- view allCoreDynamic
   let effects'' = if shouldDoDynTransform then
