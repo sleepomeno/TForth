@@ -97,8 +97,8 @@ addInfo (ENTER s c) = do
   c
 
 addInfo (IMMEDIATE c) = word.isImmediate .= True  >> c
-addInfo (PARSED_STR p c) = word.parsed .= Left p  >> c
-addInfo (PARSED_NUM c) = word.parsed .= Right ()  >> c
+addInfo (PARSED_STR p c) = word.parsed .= WordIdentifier p  >> c
+addInfo (PARSED_NUM c) = word.parsed .= Number  >> c
          
 addTypeIndices effects = do
   transformedEffects <- do
@@ -154,6 +154,6 @@ postProcess = do
     immediate' <- use $ word.isImmediate
     word.compilation .= if immediate' then IMMEDIATE_EXECUTION else APPEND_EXECUTION
   wordName <- use (word.name)
-  wordParsed <- use (word.parsed._Left)
+  wordParsed <- use (word.parsed._WordIdentifier)
   when (null wordName) $
      word.name .= Te.unpack wordParsed

@@ -77,11 +77,11 @@ expression = (`runReaderT` env) $ parsePostpone </> try' parseIfElse </> try' pa
 parseWord :: Te.Text -> CheckerM ParsedWord
 parseWord w = do
   coreWords <- use wordsMap
-  let maybeWord = M.lookup (Left w) coreWords
+  let maybeWord = M.lookup (WordIdentifier w) coreWords
   when (isNothing maybeWord) $ throwing _Impossible ("Did not find word " <> Te.unpack w)
   let w'' = maybeWord ^?! _Just
     
-  (Right w') <- satisfy' (== Right w'')
+  (WordToken w') <- satisfy' (== WordToken w'')
   (KnownWord pw, _) <- evalKnownWord  w' 
   return pw
 
@@ -91,26 +91,27 @@ isKnownWord              = do
   s        <- getState
   let maybeColonDefinition' :: Unknown -> Maybe ColonDefinitionProcessed
       maybeColonDefinition' w'   = preview (definedWords'.at (w' ^. name)._Just._ColonDefinition) s
-  maybeDefOrWord <- possWord & (_case & on _Unknown (\uk -> do 
-    iopP $ uk ^. name
+  -- maybeDefOrWord <- possWord & (_case & on _Unknown (\uk -> do 
+  maybeDefOrWord <- case possWord of
+    UnknownToken uk -> do 
+        iopP $ uk ^. name
 
-    runMaybeT $ do
-      y <- hoistMaybe $ maybeColonDefinition' uk
-      let immediate = y ^. colonDefinition.meta.isImmediate
-      if immediate then do
-        forthWord <- lift $ evalColonDefinition  (y & colonDefinition.meta.isImmediate .~ False)
-        return $ Left forthWord
-      else 
--- _Def
-        return $ Right . Left $ y ^. colonDefinition.meta.name)
+        runMaybeT $ do
+        y <- hoistMaybe $ maybeColonDefinition' uk
+        let immediate = y ^. colonDefinition.meta.isImmediate
+        if immediate then do
+            forthWord <- lift $ evalColonDefinition  (y & colonDefinition.meta.isImmediate .~ False)
+            return $ Left forthWord
+        else 
+    -- _Def
+            return $ Right . DefinitionName $ y ^. colonDefinition.meta.name
 
-    & on _Word (\word ->
+    WordToken word -> do
       if word ^. isImmediate then do 
         (forthWord, _) <- evalKnownWord (word & isImmediate .~ False)
         return $ Just . Left $ forthWord
       else 
-        return $ Just . Right . Right . view name $ word))
-        -- return $ Just . Right . new _Word $ word))
+        return $ Just . Right . WordName . view name $ word
 
   iopP $ show maybeDefOrWord
   return maybeDefOrWord

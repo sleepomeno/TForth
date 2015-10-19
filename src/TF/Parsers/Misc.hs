@@ -26,7 +26,7 @@ parsePostpone = do
   isKnownWord <- view isKnownWord'
   maybeResult <- lift isKnownWord
   let err   = lift $ unexpected "You can only postpone a known word"
-  maybe err (either (return . PostponeImmediate) (return . Postpone)) maybeResult
+  maybe err (either (return . PostponeImmediate) (return . Postpone) . fmap (view defOrWordIso)) maybeResult
 
 parseExecute :: ExpressionsM Expr
 parseExecute = do

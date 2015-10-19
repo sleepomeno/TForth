@@ -20,6 +20,10 @@ import TF.Type.Nodes
 
 
 nodeIso = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
+argIso = iso (\case { DataArg x -> Left x ; NonDataArg x -> Right x }) (\case { Left x -> DataArg x; Right x -> NonDataArg x }) 
+tokenIso = iso (\case { UnknownToken x -> Left x ; WordToken x -> Right x }) (\case { Left x -> UnknownToken x; Right x -> WordToken x }) 
+defOrWordIso =  iso (\case { DefinitionName x -> Left x ; WordName x -> Right x }) (\case { Left x -> DefinitionName x; Right x -> WordName x }) 
+compOrExecIso =  iso (\case { Compiled x -> Left x ; Executed x -> Right x }) (\case { Left x -> Compiled x; Right x -> Executed x }) 
 
 iop = traceM
 iopS = traceShowM
@@ -61,11 +65,15 @@ withoutIntersect' effs = (effs, emptyIntersect)
 
 withIntersect i effs = ForthEffect (effs, i)
 
-asTuples = (_case & (on _Compiled (\x -> view _Wrapped x `zip` repeat emptySt))
-                         & (on _Executed (\x -> zip (repeat emptySt) (view _Wrapped x))))
+-- asTuples = (_case & (on _Compiled (\x -> view _Wrapped x `zip` repeat emptySt))
+--                          & (on _Executed (\x -> zip (repeat emptySt) (view _Wrapped x))))
+asTuples effs = case effs of
+  Compiled effs -> view _Wrapped effs `zip` repeat emptySt
+  Executed effs -> repeat emptySt `zip` view _Wrapped effs
 
-effsAsTuples = (_case & (on _Compiled (\x -> x `zip` repeat emptySt))
-                         & (on _Executed (\x -> zip (repeat emptySt) x)))
+effsAsTuples effs = case effs of
+  Compiled effs -> effs `zip` repeat emptySt
+  Executed effs -> repeat emptySt `zip` effs
 
 fromThree' :: CompiledExecutedOrBoth MultiStackEffect -> [StackEffectPair]
 fromThree' (One' x) = view _Wrapped x `zip` repeat emptySt
@@ -125,11 +133,11 @@ getNextParameter = do
   return . possWordAsString $ w
 
 possWordAsString :: Token -> String
-possWordAsString = either (view name) (Te.unpack . view (parsed._Left)) 
+possWordAsString = either (view name) (Te.unpack . view (parsed._WordIdentifier)) . view tokenIso
 
 parseUnknown :: String -> CheckerM Unknown
 parseUnknown n = do
-  (Left unknown) <- satisfy' (== Left (Unknown n))
+  (UnknownToken unknown) <- satisfy' (== UnknownToken (Unknown n))
   return unknown
 
 sealed :: CheckerM x -> CheckerM x

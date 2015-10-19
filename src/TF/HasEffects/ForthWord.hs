@@ -21,9 +21,10 @@ instance HasStackEffects ForthWord where
 
 
   getStackEffects (DefE x) = do
-    let nameOfDef = view (chosen._1) x
+    -- let nameOfDef = view (compOrExecIso.chosen._1) x
     let stEffs :: CompiledOrExecuted [StackEffect]
-        stEffs = bimap (view _2) (view _2) x
+        -- stEffs = bimap (view _2) (view _2)  x
+        stEffs = fmap snd x
         effs :: [StackEffectPair]
         effs = effsAsTuples stEffs
 

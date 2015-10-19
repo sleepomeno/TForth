@@ -12,7 +12,7 @@ import           Text.PrettyPrint         (render)
 import Data.Function (on)
 
 import           Data.List
-import           TF.Util
+import           TF.Util hiding (chosen')
 -- import qualified TF.DataTypes as DT
 -- import           Data.Data
 import           Text.Parsec              hiding (token)
@@ -27,6 +27,8 @@ import qualified TF.HasEffects.OOP as OOP
 import TF.HasEffects.ForthWord()
 import TF.Type.StackEffect
 import TF.Type.Nodes
+
+chosen' = compOrExecIso . chosen
 
 instance HasStackEffects Expr where
 
@@ -113,7 +115,7 @@ instance HasStackEffects Expr where
 
     where
        l = if has (_ForthWord._DefE) create then
-             _DefE.chosen._2
+             _DefE.chosen'._2
            else
              _KnownWord.stacksEffects.chosen''._Wrapped
 
@@ -148,7 +150,7 @@ instance HasStackEffects Expr where
 
   getStackEffects (Execute effects') = do
     iop "getStackEffects Execute"
-    let effects = effects' ^. chosen
+    let effects = effects' ^. chosen'
     unless (length effects == 1) $ throwing (_ErrorE . _MultipleEffects) () 
     let effect = effects ^?! _head
     when (has (_before._head) effect) $ throwing (_ErrorE . _MalformedAssert) "No before allowed!"
@@ -164,7 +166,8 @@ instance HasStackEffects Expr where
     lift $ collectEffects (Expr $ Assert effects' False) -- TODO take forced from parsed assertion
 
     uniqueIdentifier <- lift $ identifier <<+= 1
-    let executeEffs = effsAsTuples $ compOrExec [eff & _before %~ ((Wildcard, Just uniqueIdentifier):)] 
+    -- let executeEffs = effsAsTuples $ compOrExec [eff & _before %~ ((Wildcard, Just uniqueIdentifier):)] 
+    let executeEffs = effsAsTuples $ (effects' & chosen' .~ [eff & _before %~ ((Wildcard, Just uniqueIdentifier):)] )
 
     return $ withoutIntersect $ executeEffs
 
@@ -176,19 +179,19 @@ instance HasStackEffects Expr where
   getStackEffects (Assert effs forced) = do
     let beforeToAfter :: StackEffect -> StackEffect
         beforeToAfter eff = eff & _before .~ (eff ^. _after)
-        effs' = bimap (map beforeToAfter) (map beforeToAfter) effs
+        effs' = bimap (map beforeToAfter) (map beforeToAfter) . view compOrExecIso $ effs
 
     -- iopC "assert-effekts"
     -- mapM (iopC . render . P.stackEffect) (effs' ^. chosen)
 
-    when (has (chosen.traverse._before._head) effs) $ throwing _MalformedAssert "No before arguments allowed"
-    when (has (chosen.traverse._streamArgs.traverse._Defining) effs) $ throwing _MalformedAssert "No defining arguments allowed!"
-    when (has (chosen.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Nothing) effs) $ throwing _MalformedAssert "Runtime Specification is Nothing!"
-    when (has (chosen.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._UnknownR) effs) $ throwing _MalformedAssert "Runtime Specification is UnknownR!"
-    when (has (chosen.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._NoR) effs) $ throwing _MalformedAssert "Runtime Specification is NoR!"
-    when (has (chosen.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR) effs) $ throwing _MalformedAssert "Runtime Specification is ResolvedR!"
+    when (has (chosen'.traverse._before._head) effs) $ throwing _MalformedAssert "No before arguments allowed"
+    when (has (chosen'.traverse._streamArgs.traverse._Defining) effs) $ throwing _MalformedAssert "No defining arguments allowed!"
+    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Nothing) effs) $ throwing _MalformedAssert "Runtime Specification is Nothing!"
+    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._UnknownR) effs) $ throwing _MalformedAssert "Runtime Specification is UnknownR!"
+    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._NoR) effs) $ throwing _MalformedAssert "Runtime Specification is NoR!"
+    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR) effs) $ throwing _MalformedAssert "Runtime Specification is ResolvedR!"
 
-    return $ withoutIntersect $ effsAsTuples effs'
+    return $ withoutIntersect $ effsAsTuples $ effs' ^. from compOrExecIso
 
   getStackEffects (ColonExprClash n stackCommentEffects) = do
     let isForced = has (_Just._2.only True) stackCommentEffects

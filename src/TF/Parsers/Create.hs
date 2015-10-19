@@ -29,7 +29,8 @@ parseCreating = do
   iop $ "In create"
   let parseUnknown' :: CheckerM (ForthWord, DefiningArg)
       parseUnknown' = do
-         (Left uk@(Unknown _)) <- (satisfy' isLeft)
+         uk <- parseUnknownToken'
+         
          -- iopP $ "Is an unknown named " ++ (view name uk)
          (forthWord, newState) <- evalUnknown uk
          modifyState (set stateVar newState)
@@ -37,7 +38,7 @@ parseCreating = do
          -- iopP $ render . P.forthWord $ forthWord
          unless (has _DefE forthWord) $ fail "not a defE"
 
-         let (_, effs) = forthWord ^?! (_DefE.chosen)
+         let (_, effs) = forthWord ^?! (_DefE.compOrExecIso.chosen)
          let defArg :: Maybe DefiningArg
              defArg = preview (_head._streamArgs.traverse._Defining) effs
 
@@ -87,7 +88,7 @@ parseDoes = do
 parseStoringValue  = do
   forbidden' <- forbiddenInBranch
   coreWords <- lift $ use wordsMap
-  let commaDoes = mapMaybe (\w -> M.lookup (Left w) coreWords) [",",  "does>"]
+  let commaDoes = mapMaybe (\w -> M.lookup (WordIdentifier w) coreWords) [",",  "does>"]
   let forbidden = commaDoes ++ forbidden'
   parseNodeWithout <- view parseNodeWithout'
   parseWord <- view parseWord'

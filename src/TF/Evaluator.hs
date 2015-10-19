@@ -37,15 +37,15 @@ import TF.Type.Nodes
 
 
 evalToken :: Token -> CheckerM (ForthWord, SemState)
-evalToken = _case & on _Word evalKnownWord & on _Unknown evalUnknown
-
+evalToken (UnknownToken x) =  evalUnknown x
+evalToken (WordToken x ) = evalKnownWord x
   
 -- evalForthWord                   = evalForthWordWithout []
 
 -- |Parses a Token - when it's a unknown check if there is a definition. If the definition is immediate, we are in compile-mode and it contains postpones we need to prepend the body of the definition to the current stream
 evalForthWordWithout       :: [Word]     -> CheckerM ForthWord
 evalForthWordWithout ws         = do
-            possWord                       <- noneOf' (map Right ws)
+            possWord                       <- noneOf' (map WordToken ws)
             (w,st) <- possWord & evalToken
 
             modifyState (set stateVar st)
@@ -158,9 +158,9 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
 
   let args = stEff ^. _streamArgs
       compiledOrExecuted = if executed  then
-                             Right
+                             Executed
                            else
-                             Left
+                             Compiled
 
   iopP $ "EXECUTED:"
   iopP $ show executed
@@ -195,9 +195,9 @@ evalCreatedWord uk = do
       executed = st == INTERPRETSTATE 
 
   let compiledOrExecuted = if executed  then
-                             Right
+                             Executed
                            else
-                             Left
+                             Compiled
 
   return (DefE . compiledOrExecuted . (, effs) $ ukName, st)
 
@@ -217,7 +217,7 @@ evalDefinedWord uk = do
      lift $ when (isImmediateColonDefinition definition) $ do
                input <- getInput
                coreWords <- use wordsMap
-               let lookupW w = fromJust $ M.lookup (Left (Te.pack w)) coreWords
+               let lookupW w = fromJust $ M.lookup (WordIdentifier (Te.pack w)) coreWords
                -- let asdf :: Lens' (Either NameOfDefinition NameOfWord) (Either NameOfDefinition Word)
                --     asdf = undefined
                let defOrWords' :: [Either NameOfDefinition NameOfWord]
@@ -227,8 +227,8 @@ evalDefinedWord uk = do
                    defOrWords = over (traverse._Right) lookupW $ defOrWords'
                    postpones :: [Token]
                    postpones = defOrWords & map
-                               (either (Left . Unknown)
-                                       Right) 
+                               (either (UnknownToken . Unknown)
+                                       WordToken) 
                setInput (postpones ++ input)
      forthWord <- lift $ evalColonDefinition cDef -- state'
      return (forthWord, state')
@@ -248,7 +248,7 @@ handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR ind
   case forthWord of
     UnknownE _ -> return arg
     DefE definition -> do
-      let effs = view (chosen._2) definition :: [StackEffect]
+      let effs = view (compOrExecIso.chosen._2) definition :: [StackEffect]
       iop "EFF:"
       mapM_ (iopP . render. P.stackEffect) effs
       adjustHOT effs
@@ -298,11 +298,11 @@ resolveStreamArgs (x:xs) acc =  do
           Nothing  -> (do
             w <- anyToken :: CheckerM Token
             case w of 
-                uk@(Left (Unknown name)) -> do
+                uk@(UnknownToken (Unknown name)) -> do
                     x' <- handleHOTstreamArgument x uk
                     return (name, x')
-                Right (Word (Right ()) _ _ _ _ _ _ _) -> throwing _NumberAsStreamArg ()
-                knownWord@(Right w) -> do
+                WordToken (Word Number _ _ _ _ _ _ _) -> throwing _NumberAsStreamArg ()
+                knownWord@(WordToken w) -> do
                   x' <- handleHOTstreamArgument x knownWord
                   return (w ^?! (parsed._WordIdentifier.unpacked), x'))
           Just endDelimiter -> do

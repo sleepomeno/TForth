@@ -45,9 +45,10 @@ withTrace p = do
       s
   return result
 
+
 parseKeyword :: String -> ExpressionsM ()
 parseKeyword keyword = do
-  Left uk <- lift $ satisfy' isLeft
+  uk <- parseUnknownToken
   guard $ (uk ^. name) == keyword
 
 
@@ -110,16 +111,22 @@ errorHandler handlingFunction colonName = [
                      handler _UnknownWord handlingFunction
                     ]
 
-parseUnknownName :: ExpressionsM String
+parseUnknownToken'  = do 
+  UnknownToken uk <- satisfy' (has _UnknownToken)
+  return uk
+
+parseUnknownToken  = do 
+  lift parseUnknownToken'
+
 parseUnknownName = do
-  Left uk <- lift $ satisfy' isLeft
+  uk <- parseUnknownToken
   return (uk ^. name)
 
 forbiddenInBranch :: ExpressionsM [Word]
 forbiddenInBranch = do
   coreWords <- use wordsMap
-  return $ catMaybes $ map (\w -> M.lookup (Left w) coreWords) ["then", ";", "postpone"]
+  return $ catMaybes $ map (\w -> M.lookup (WordIdentifier w) coreWords) ["then", ";", "postpone"]
 
 (</>) = mplus 
 
-compOrExec' = lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then Right else Left) <$> getState
+compOrExec' = lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then Executed else Compiled) <$> getState

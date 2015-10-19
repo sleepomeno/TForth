@@ -11,19 +11,16 @@ import Lens.Family.Total (Empty)
 import GHC.Generics (Generic)
 import           Data.Data hiding (DataType)
 import Lens.Simple 
--- import TF.Type.Expressions.Expr (Expr(..))
--- import TF.Type.Expressions.OOP (OOPExpr(..))
 
-type Number = ()
-type Parsable = Either Te.Text Number -- Str String | Number deriving (Show, Eq)
+data Parsable = WordIdentifier Te.Text | Number deriving (Show,Eq,Ord) -- Str String | Number deriving (Show, Eq)
 type NameOfDefinition = String  
-type CompiledOrExecuted a = Either a a 
-_Executed = _Right
-_Compiled = _Left
+
+data CompiledOrExecuted a = Compiled a | Executed a deriving (Show,Eq,Functor)
 
 newtype Unknown = Unknown {
                      _unknownName :: String
                   } deriving (Show, Eq)
+
 data Threes a b c = One'  a | Two' b |  Three' c  deriving (Show, Eq, Generic)
 makeTraversals ''Threes
 
@@ -135,5 +132,7 @@ makeTraversals ''Node
 
 makeTraversals ''OOMethodSem
 makeTraversals ''OOFieldSem'
+makeTraversals ''Parsable
+makeTraversals ''CompiledOrExecuted
 
 makeFields ''Intersections

@@ -234,8 +234,7 @@ parseSuperclassMethodCall = do
 
 parseClassName :: ExpressionsM String
 parseClassName = do
-  (Left uk) <- lift $ satisfy' isLeft
-  let className = uk ^. name
+  className <- parseUnknownName
   s <-  lift getState
   let isClassKnown = getAny $ views (classInterfaces.to M.keys.traverse) (Any . (== className)) s 
   when (not isClassKnown) $ iopP $ "Class " ++ className ++ " is unknown!"
@@ -245,8 +244,7 @@ parseClassName = do
 
 parseMethodName :: ClassName -> ExpressionsM String
 parseMethodName className = do
-  (Left uk) <- lift $ satisfy' isLeft
-  let methodName = uk ^. name
+  methodName <- parseUnknownName
   s <- lift getState
   let isMethodKnown = getAny $ views (classInterfaces.ix className.traverse._1)
                                      (Any . (== methodName)) s

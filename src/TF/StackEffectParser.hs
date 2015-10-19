@@ -35,7 +35,8 @@ atLeastOneSpace = many1 space
 rParenIS = "<paren>"
 quoteIS = "<\">"
 
-parseInputStreamArgument :: ParseStackEffectsM (Either c (Either DefiningArg StreamArg))
+-- parseInputStreamArgument :: ParseStackEffectsM (Either c (Either DefiningArg StreamArg))
+parseInputStreamArgument :: ParseStackEffectsM (DataArgOrStreamArg [IndexedStackType])
 parseInputStreamArgument = do
     let streamMarker = "'"
         definedWordMarker = "D'"
@@ -80,7 +81,7 @@ parseInputStreamArgument = do
     result <- try definingArg <|> notDefiningArg
     atLeastOneSpace
     -- return $ _StreamArg # result
-    return $ Right result
+    return $ NonDataArg result
 
 parseStackEffects :: ParseStackEffectsM String
 parseStackEffects = try (parseStackEffects' ('/', False)) <|> parseStackEffects' ('&', True)
@@ -149,7 +150,7 @@ parseStackEffect = do
   let parseSingleSemiEffectBefore :: ParseStackEffectsM SingleSemiEffect
       parseSingleSemiEffectBefore = 
         -- many  . labeled  "type symbols seperated by spaces or input stream arguments" $ parseInputStreamArgument <|> ((_DataType #) <$> choice alternativeTypes') 
-        many  . labeled  "type symbols seperated by spaces or input stream arguments" $ parseInputStreamArgument <|> (Left <$> choice alternativeTypes') 
+        many  . labeled  "type symbols seperated by spaces or input stream arguments" $ parseInputStreamArgument <|> (DataArg <$> choice alternativeTypes') 
 
       parseSingleSemiEffectAfter :: ParseStackEffectsM [[IndexedStackType]]
       parseSingleSemiEffectAfter = many . labeled  "type symbols seperated by spaces" . choice $ alternativeTypes'
@@ -158,7 +159,7 @@ parseStackEffect = do
 
   dataTypesAndStreamArgs <- parseSemiEffects parseSingleSemiEffectBefore 
 
-  let (typesBefore, streamArgs) = unzip . map (lefts &&& rights) $ dataTypesAndStreamArgs
+  let (typesBefore, streamArgs) = unzip . map ((lefts &&& rights) . map (view argIso)) $ dataTypesAndStreamArgs
 
   modifyState $ s._parsestateBefore .~  typesBefore
   modifyState $ s._parsestateStreamArguments .~ streamArgs

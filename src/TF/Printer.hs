@@ -10,7 +10,7 @@ import           Control.Lens hiding (noneOf)
 import Control.Arrow ((***),(>>>))
 import Data.Monoid
 import Data.Maybe
-import TF.Util (nodeIso)
+import TF.Util (nodeIso, tokenIso,compOrExecIso)
 
 import TF.ForthTypes
 import TF.Type.StackEffect
@@ -26,10 +26,10 @@ infoNode = either infoForthWord infoExpr . view nodeIso
 
 
 possibleWord :: Token -> Doc
-possibleWord = either unknown wordSemantics
+possibleWord = either unknown wordSemantics . view tokenIso
 
 possibleWords :: [Token] -> Doc
-possibleWords = vcat . map (either unknown wordSemantics)
+possibleWords = vcat . map (either unknown wordSemantics. view tokenIso) 
 
 unknown :: Unknown -> Doc
 unknown (Unknown name) = text "Unknown named:" <+> text name
@@ -38,9 +38,9 @@ wordSemantics :: Word -> Doc
 wordSemantics w = text "Word:" <+> text (view name w)
 
 compiledOrExecuted :: CompiledOrExecuted MultiStackEffect -> Doc
-compiledOrExecuted = _case & on _Compiled (showArgs "Compiled")
-                           & on _Executed (showArgs "Executed")
-
+compiledOrExecuted effs = case effs of
+  Compiled effs -> showArgs "Compiled" effs
+  Executed effs -> showArgs "Executed" effs
 
 compiledOrExecutedOrBoth :: CompiledExecutedOrBoth MultiStackEffect -> Doc
 compiledOrExecutedOrBoth = _case & on _CompiledEff (showArgs "Compiled")
@@ -60,7 +60,7 @@ showEffs compExec = \(MultiStackEffect d) -> text compExec $+$ nested (vcat . ma
 
 infoForthWord :: ForthWord -> Doc
 infoForthWord (UnknownE (Unknown x)) = text $ "Unknown " <> x
-infoForthWord (DefE def) = text "DefE" <+> (text $ def ^. chosen._1)
+infoForthWord (DefE def) = text "DefE" <+> (text $ def ^. compOrExecIso.chosen._1)
 infoForthWord (KnownWord (ParsedWord _ n _ _ _)) = text "KnownWord" <+> (text n)
                                              
 forthWord :: ForthWord -> Doc
@@ -167,7 +167,7 @@ infoOOPExpr (NoName _ _ clazz method) = text $ "Noname for class " ++ clazz ++ "
 infoOOPExpr (NoNameClash _ clazz method) = text $ "NonameClash for class " ++ clazz ++ " and method " ++ method
 infoOOPExpr (Class name _ _ _) = text $ "CLASS " ++ name
 infoOOPExpr (NewObject _) = text "NEW OBJECT"
-infoOOPExpr (FieldCall f) = text "FIELD CALL of" <+> text (f ^. chosen)
+infoOOPExpr (FieldCall f) = text "FIELD CALL of" <+> text (f ^. compOrExecIso.chosen)
 
 infoExpr :: Expr -> Doc
 infoExpr (Create _ _ _) = text "CREATE"
@@ -199,9 +199,9 @@ oopExpr (Class name variables methods oldClass) = showClass name oldClass variab
 oopExpr (NewObject compOrExec) = text "NEW OBJECT" <+> text "which is" <+> typeOfObject
                               where
                                 typeOfObject = case compOrExec of
-                                  Left x -> text "compiled of class" <+> text x
-                                  Right x -> text "executed of class" <+> text x
-oopExpr (FieldCall cOre) = text "FIELD CALL of" <+> text (cOre ^. chosen) <+> text "which is" <+> text (either (const "compiled") (const "executed") cOre)
+                                  Compiled x -> text "compiled of class" <+> text x
+                                  Executed x -> text "executed of class" <+> text x
+oopExpr (FieldCall cOre) = text "FIELD CALL of" <+> text (cOre ^. compOrExecIso.chosen) <+> text "which is" <+> text (either (const "compiled") (const "executed") . view compOrExecIso $ cOre)
                            
 expr :: Expr -> Doc
 expr (OOPExpr x) = oopExpr x
@@ -212,8 +212,8 @@ expr (Create create initialization does) = text "CREATE" $+$ printInit initializ
      printInit (Just (exprs, comma)) = nested (text "INIT" $+$ nested (pprint exprs $+$  forthWordOrExpr comma))
      printDoes Nothing = mempty
      printDoes (Just exprs) = nested (text "DOES" $+$ nested (pprint exprs))
-expr (Assert xs f) = text "Assert" $+$ compiledOrExecuted (xs & chosen %~ MultiStackEffect)
-expr (Cast xs ) = text "Cast" $+$ compiledOrExecuted (xs & chosen %~ MultiStackEffect)
+expr (Assert xs f) = text "Assert" $+$ compiledOrExecuted (xs & compOrExecIso.chosen %~ MultiStackEffect)
+expr (Cast xs ) = text "Cast" $+$ compiledOrExecuted (xs & compOrExecIso.chosen %~ MultiStackEffect)
 expr (Interpreted xs) = text "INTERPRETED" $+$ nested (pprint xs)
 expr (ColonExpr n sem xs) = text "COLON" <+> text n $+$ nested (ppDoc sem) $+$ nested (pprint xs)
 expr (ColonExprClash n sem) = text "COLONCLASH" <+> text n $+$ nested (ppDoc sem)
@@ -224,7 +224,7 @@ expr (Postpone x) = text "Postpone" $+$ nested ((either text text) x)
 
 expr (PostponeImmediate x) = text "PostponeImmediate" $+$ nested (forthWord x)
 expr (Tick effects pw) =  text "TICK" $+$ nested ((text "EFFECTS:" $+$ nested (vcat $ map stackEffect effects)) $+$ (text "PARSED_WORD:" $+$ nested (forthWord (KnownWord pw))))
-expr (Execute xs) = text "Execute" $+$ compiledOrExecuted (xs & chosen %~ MultiStackEffect)
+expr (Execute xs) = text "Execute" $+$ compiledOrExecuted (xs & compOrExecIso.chosen %~ MultiStackEffect)
 expr (Include file) = text $ "Include: " <> file
 expr (Require file) = text $ "Require: " <> file
                                                                                                  

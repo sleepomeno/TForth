@@ -1,4 +1,4 @@
-{-# LANGUAGE   FlexibleContexts,  MultiWayIf  #-}
+{-# LANGUAGE   FlexibleContexts,  RankNTypes, MultiWayIf, NoMonomorphismRestriction  #-}
 
 module TF.HasEffects.OOP where
 
@@ -11,7 +11,7 @@ import           Control.Monad.Writer
 import           Text.PrettyPrint         (render)
 
 import           Data.Maybe
-import           TF.Util
+import           TF.Util hiding (chosen')
 import           TF.SubtypeUtil
 -- import qualified TF.DataTypes as DT
 -- import           Data.Data
@@ -25,32 +25,41 @@ import TF.CheckerUtils
 import TF.Type.StackEffect
 import TF.Type.Nodes
 
+-- chosen' :: forall b. Lens' (CompiledOrExecuted b) b 
+chosen' = compOrExecIso . chosen
+
 compOrExec' cOrE = case cOrE of { Left _ -> Left ; Right _ -> Right }
 
 getStackEffects' (NewObject cOrE) = do
     -- let compOrExec = case cOrE of { Left _ -> new _Compiled ; Right _ -> new _Executed }
     -- let compOrExec = case cOrE of { Left _ -> Left ; Right _ -> Right }
-    let compOrExec = compOrExec' cOrE
-        name = case cOrE of { Left x -> x; Right x -> x }
+    -- let compOrExec = compOrExec' cOrE
+        -- name = case cOrE of { Left x -> x; Right x -> x }
+    let name = cOrE ^. chosen'
         -- eff = [StackEffect [] [] [(NoReference $ _ClassType # name, Just 1)]]
         eff = [StackEffect [] [] [(NoReference $ ClassType name, Just 1)]]
-    return $ withoutIntersect (effsAsTuples $ compOrExec eff)
+    -- return $ withoutIntersect (effsAsTuples eff)
+    return $ withoutIntersect (effsAsTuples $ cOrE & compOrExecIso.chosen .~ eff)
 
 getStackEffects' (SuperClassMethodCall className method) = do
     let getEffs :: [(Method, OOMethodSem)] -> [StackEffect]
         getEffs methods = concatMap (\(_, methodSem) -> case methodSem of { InferredByMethod (effs, _) -> effs ; ByDefinition (effs, _) -> effs }) $ filter (\(x,_) -> x == method)  methods
     effs <- lift $ views classInterfaces (getEffs . fromJust . M.lookup className) <$> getState -- :: CheckerM [StackEffect]
-    return $ withoutIntersect $ effsAsTuples $ (Left effs)
+    return $ withoutIntersect $ effsAsTuples $ (Compiled effs)
 
 getStackEffects' (MethodCall cOrE) = do
-    let compOrExec = compOrExec' cOrE
-    methodEffs <- lift $ compOrExec . concatMap snd <$> allMethodImplementationss (cOrE ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
+    -- let compOrExec = compOrExec' cOrE
+    -- methodEffs <- lift $ compOrExec . concatMap snd <$> allMethodImplementationss (cOrE ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
+    methodEffs' <- lift $ allMethodImplementationss (cOrE ^. chosen') -- :: CheckerM (CompiledOrExecuted [StackEffect])
+    let methodEffs =  cOrE & chosen' .~ concatMap snd methodEffs'
     return $ withoutIntersect $ effsAsTuples methodEffs
 
 getStackEffects' (FieldCall cOrE) = do
-    let compOrExec = compOrExec' cOrE
-    fieldEffs <- lift $ compOrExec . concatMap snd <$> allFieldImplementations (cOrE ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
-    let fieldEffs' = fieldEffs ^. chosen
+    -- let compOrExec = compOrExec' cOrE
+    -- fieldEffs <- lift $ compOrExec . concatMap snd <$> allFieldImplementations (cOrE ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
+    fieldEffs' <- lift $ allFieldImplementations (cOrE ^. chosen') 
+    let fieldEffs = cOrE & chosen' .~ concatMap snd fieldEffs'
+    let fieldEffs' = fieldEffs ^. chosen'
 
     -- iopC "FFFIEELDCALL"
     -- liftIO (mapM_ (putStrLn . render . P.stackEffect) $ fieldEffs' )

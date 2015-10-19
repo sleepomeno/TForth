@@ -39,13 +39,11 @@ import qualified Data.Tree.Zipper as TreeZ
 --------------------------------------
 type SpacesDelimitedParsing = String
 
-type DataArgOrStreamArg a b = Either a b
-_DataType = _Left
-_StreamArg = _Right
+data DataArgOrStreamArg dataArg = DataArg dataArg | NonDataArg DefiningOrNot deriving (Show, Eq)
 
-type StackArg = DataArgOrStreamArg [IndexedStackType] DefiningOrNot
-type StackArg' = DataArgOrStreamArg IndexedStackType DefiningOrNot
-type StackArg'' = DataArgOrStreamArg IndexedStackType DefiningOrNot
+type StackArg = DataArgOrStreamArg [IndexedStackType]
+type StackArg' = DataArgOrStreamArg IndexedStackType 
+type StackArg'' = DataArgOrStreamArg IndexedStackType 
 
 -- type DefiningOrNot' a = Either a a
 _Defining = _Left
@@ -295,8 +293,8 @@ makeTraversals ''InterpretationSemantics
 makeWrapped ''ExecutionSemantics
 makeWrapped ''RuntimeSemantics
 
-_WordIdentifier = _Left
-_Number = _Right
+-- _WordIdentifier = _Left
+-- _Number = _Right
 
 
 type UnknownWithState = (Unknown, SemState)
@@ -306,13 +304,10 @@ defaultSemantics = Semantics "" Nothing (MultiStackEffect [])
 _Error = _Left
 _Result = _Right
 
--- type DefOrWord = Either NameOfDefinition Word
-type DefOrWord = Either NameOfDefinition String
-_Def = _Left
-_Word = _Right
+data DefOrWord = DefinitionName NameOfDefinition | WordName NameOfWord deriving (Show,Eq)
 
-type Token = Either Unknown Word
-_Unknown = _Left
+data Token = UnknownToken Unknown | WordToken Word deriving (Show,Eq)
+makeTraversals ''Token
 
 
 isImmediateColonDefinition = view $ meta.isImmediate 
@@ -426,7 +421,7 @@ instance HasDefault (RuntimeSemantics ) where
   def = RunSem def
 
 instance HasDefault Word where
-  def = Word (Left "") def def def def def def (Intersections False False)
+  def = Word (WordIdentifier "") def def def def def def (Intersections False False)
 
 instance HasDefault Semantics where
   def = Semantics def def def
