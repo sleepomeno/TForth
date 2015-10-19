@@ -884,6 +884,6 @@ coreWordsByIdentifier = foldM addToList M.empty coreWords'
   addToList m b = do
       b' <- buildWord' b :: Script' BuildState
       let w' = view word b'
-      return $ M.insert (view parsed w') w' m
+      return $ M.insert (w' ^. _parsedW) w' m
   coreWords' = [sToNumberQ, pad, store, does, create, colon, semicolon, numberSign, numberSignGreater, numberSignS, bracketTick, tick, paren, star, starSlash, starSlashMod, plus, plusStore, plusLoop, comma, minus, TF.Words.dot, dotquote, slash, slashMod,zeroLess, zeroEquals, onePlus, oneMinus, twoStore, twoStar, if', then',twoSlash,twoFetch,twoDrop,twoDup,twoOver,twoSwap,lessThan,lessNumberSign,equals,greaterThan,toBody,toIn,toR, fetch, abort, abs', accept, align, aligned, allot, and', base, bl, cStore, cComma, cFetch, cellPlus, cells, TF.Words.char, charPlus, chars, constant, count, cr, decimal, TF.Words.depth, drop, dup, emit , execute, exit, find, fill, fmMod, here, hold, i, invert, j, key, leave, lshift, mStar, TF.Words.max, TF.Words.min, TF.Words.mod, move, TF.Words.negate, TF.Words.or, TF.Words.over, quit, rFrom, rFetch, recurse, rot, rShift, sQuote, do', loop, postpone, else', immediate', begin, until, swap, leftBracket, literal, sToD, sign, smslashrem, source, space, spaces, TF.Words.state, type', uDot, uLessThan, umStar, umMod, questionDup, toNumber]
 

@@ -43,7 +43,7 @@ parseNextWord = do
     let parseToken :: ParsecT String () Script' Token
         parseToken = do
           w' <- (Te.toLower . Te.pack) <$> wordIdentifier
-          coreWords <- use wordsMap
+          coreWords <- use _wordsMap
           -- let possibleWord = M.lookup (new _WordIdentifier w') coreWords
           let possibleWord = M.lookup (WordIdentifier w') coreWords
           -- return $ maybe (new _Unknown . Unknown . Te.unpack $ w')
@@ -77,8 +77,8 @@ parseWords t = do
   additionalWords <- mapM (fmap (view word) . buildWord') additionalWordsDefinitions
 
   coreWordsByIdentifier <- W.coreWordsByIdentifier
-  let coreWords' = foldl (\m w -> M.insert (view parsed w) w m) coreWordsByIdentifier additionalWords
+  let coreWords' = foldl (\m w -> M.insert (w ^. _parsedW) w m) coreWordsByIdentifier additionalWords
 
-  wordsMap .= coreWords'
+  _wordsMap .= coreWords'
   result <- runParserT parseProgram' () "" t 
   lift $ either (throwing _ParseErr' . show) return result

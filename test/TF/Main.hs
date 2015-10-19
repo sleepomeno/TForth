@@ -124,8 +124,8 @@ dynamic = do
 
     it "all types are dynamic in the effect of the addition word" $ do
       let result = check "+"
-      result `shouldHave` (_Success._2.effects._Wrapped._1.traverse._2._before.traverse._1.only Dynamic)
-      result `shouldHave` (_Success._2.effects._Wrapped._1.traverse._2._after.traverse._1.only Dynamic)
+      result `shouldHave` (_Success._2._effects._Wrapped._1.traverse._2._before.traverse._1.only Dynamic)
+      result `shouldHave` (_Success._2._effects._Wrapped._1.traverse._2._after.traverse._1.only Dynamic)
     context "and allowDynamicInStackComments set to False" $ do
       let check = check' (defTestConfig & allCoreDynamic .~ True & allowDynamicInStackComments .~ False)
       it "type clashes on using dyn in a stack comment" $
@@ -166,19 +166,19 @@ allowLocalFailureFeature = do
     it "type checks a program where that word is not used" $
         check ": foo bl + ;" `shouldHave`  _Success
     it "creates a dictionary entry for that word" $ 
-        check ": foo 3 0= + ;" `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Failed)
+        check ": foo 3 0= + ;" `shouldHave` (_Success._2._definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Failed)
 
     it "type clashes on using that word top-level" $
         check ": foo 4 0= + ; 9 foo" `shouldHave` (_Failure._ErrorT._ClashInWord)
     it "using that word in another word definition results in the correct FAILED reason" $ do
         let prog = ": foo 0 0= + ; : bar foo ;"
-        check prog `shouldHave` (_Success._2.definedWords'.at "bar"._Just._ColonDefinition.processedEffects._Failed.filtered (\bar -> "foo" `isInfixOf` bar))
+        check prog `shouldHave` (_Success._2._definedWords'.at "bar"._Just._ColonDefinition.processedEffects._Failed.filtered (\bar -> "foo" `isInfixOf` bar))
 
 simpleColonDefinition = do
   let check = fst . runChecker' defTestConfig
 
       getColonDefEffects w program =
-        preview (_Right._2.definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]
+        preview (_Right._2._definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]
       effectsOfColonDefinition = _ColonDefinition.processedEffects._Checked.multiEffects
 
       name = "myword"
@@ -189,10 +189,10 @@ simpleColonDefinition = do
       check simpleColonDefinition `shouldHave` _Success
 
   it "has made a new dictionary entry" $ 
-    check simpleColonDefinition `shouldHave` (_Success._ParseState.definedWords'.at name._Just.effectsOfColonDefinition)
+    check simpleColonDefinition `shouldHave` (_Success._ParseState._definedWords'.at name._Just.effectsOfColonDefinition)
 
   it "has compiled a single stack effect" $ 
-    check simpleColonDefinition `shouldHave` (_Success._ParseState.definedWords'.at name._Just.effectsOfColonDefinition.to length.only 1)
+    check simpleColonDefinition `shouldHave` (_Success._ParseState._definedWords'.at name._Just.effectsOfColonDefinition.to length.only 1)
 
   it "has compiled the correct stack effect" $ do
     let effect = getColonDefEffects name simpleColonDefinition ^?! (_Just._head)
@@ -239,18 +239,18 @@ oopFeature = do
   context "inferring the type of a field" $
     it "infers N when its used in the context of addition" $ 
 
-      check  "object class var text end-class button button new text @ 4 +"`shouldHave` (_Success._2.classFields.at "button"._Just.traverse.filtered (\(x,_) -> x == "text")._2._InferredByField._after._head._1._Reference._NoReference._PrimType.only FT.n)
+      check  "object class var text end-class button button new text @ 4 +"`shouldHave` (_Success._2._classFields.at "button"._Just.traverse.filtered (\(x,_) -> x == "text")._2._InferredByField._after._head._1._Reference._NoReference._PrimType.only FT.n)
   it "taking the type from the class definition" $ 
   
-      check "object class var text ( *char ) end-class button"`shouldHave` (_Success._2.classFields.at "button"._Just.traverse.filtered (\(x,_) -> x == "text")._2._ByFieldDefinition._after._head._1._Reference._NoReference._PrimType.only FT.char)
+      check "object class var text ( *char ) end-class button"`shouldHave` (_Success._2._classFields.at "button"._Just.traverse.filtered (\(x,_) -> x == "text")._2._ByFieldDefinition._after._head._1._Reference._NoReference._PrimType.only FT.char)
 
   context "deriving classes" $
     context "fields are derived" $ do
       it "when the field type was defined in the superclass definition" $ 
-        check  "object class var size ( *n ) end-class button button class end-class subbutton" `shouldHave` (_Success._2.classFields.at "subbutton"._Just.traverse.filtered (\(x,_) -> x == "size")._2._ByFieldDefinition._after._head._1._Reference._NoReference._PrimType.only FT.n)
+        check  "object class var size ( *n ) end-class button button class end-class subbutton" `shouldHave` (_Success._2._classFields.at "subbutton"._Just.traverse.filtered (\(x,_) -> x == "size")._2._ByFieldDefinition._after._head._1._Reference._NoReference._PrimType.only FT.n)
 
       it "when the field type was inferred" $ 
-        check "object class var size end-class button button class end-class subbutton button new size @ 2 +" `shouldHave` (_Success._2.classFields.at "subbutton"._Just.traverse.filtered (\(x,_) -> x == "size")._2._InferredByField._after._head._1._Reference._NoReference._PrimType.only FT.n)
+        check "object class var size end-class button button class end-class subbutton button new size @ 2 +" `shouldHave` (_Success._2._classFields.at "subbutton"._Just.traverse.filtered (\(x,_) -> x == "size")._2._InferredByField._after._head._1._Reference._NoReference._PrimType.only FT.n)
 
   context "checking method implementations" $ do
     context "favours the forced effect specified on class definition" $ do
@@ -276,9 +276,9 @@ create = do
   let check = fst . runChecker' defTestConfig
 
       getColonDefEffects w program =
-        (preview (_Right._2.definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_Right._2._definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]) ^?! _Just
       getCreateDefEffects w program =
-        (preview (_Right._2.definedWords'.at w._Just._CreateDefinition) (check program) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_Right._2._definedWords'.at w._Just._CreateDefinition) (check program) :: Maybe [StackEffect]) ^?! _Just
   it "when a colon definition's body contains 2 'create' the compiled effect contains two defining arguments" $ do
     let name = "myfunc"
         colonDef = ": myfunc create create ;"
@@ -486,25 +486,25 @@ assertions = do
   let check = fst . runChecker' (defTestConfig & allowLocalFailure .~ True)
 
       getColonDefEffects w program =
-        (preview (_Right._2.definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_Right._2._definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]) ^?! _Just
       getCreateDefEffects w program =
-        (preview (_Right._2.definedWords'.at w._Just._CreateDefinition) (check program) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_Right._2._definedWords'.at w._Just._CreateDefinition) (check program) :: Maybe [StackEffect]) ^?! _Just
   it "throws an error failure" $ do
     let program = ": foo 2 3 ( Assert xt ) + ;"
         result = fst $ runChecker' (defTestConfig & allowLocalFailure .~ False) program
     result `shouldHave` (_Failure._TypeClash)
 
   it "validates correct assertions for the top part of the stack" $ 
-    check   ": foo 2 3 ( Assert n ) + ;" `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Checked.multiEffects)
+    check   ": foo 2 3 ( Assert n ) + ;" `shouldHave` (_Success._2._definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Checked.multiEffects)
 
   it "rejects incorrect forced assertion which does not mention whole stack" $ 
-    check   ": foo 2 3 ( Assert! n ) + ;"  `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Failed)
+    check   ": foo 2 3 ( Assert! n ) + ;"  `shouldHave` (_Success._2._definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Failed)
 
   it "rejects incorrect forced assertion which mentions more than is on the stack" $ 
-    check   ": foo 3 ( Assert! n n ) + ;"  `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Failed)
+    check   ": foo 3 ( Assert! n n ) + ;"  `shouldHave` (_Success._2._definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Failed)
 
   it "validates correct assertions" $ 
-    check   ": foo 2 3 ( Assert n n ) + ;" `shouldHave` (_Success._2.definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Checked.multiEffects)
+    check   ": foo 2 3 ( Assert n n ) + ;" `shouldHave` (_Success._2._definedWords'.at "foo"._Just._ColonDefinition.processedEffects._Checked.multiEffects)
 
   context "in a tick construct" $ do
     context "which is executed" $ do
@@ -516,18 +516,18 @@ assertions = do
         check ": foo ( n n -- n ) + ; ' foo ( Assert xt:[ n xd -- n ] )" `shouldHave` (_Failure._Clash)
     context "which is compiled" $ do
       it "with no word stack comment" $ 
-        check  ": foo ; : bla foo ( 'addition':[ n n -- n ] -- ) ' ;"  `shouldHave` (_Success._2.definedWords'.at "bla"._Just._ColonDefinition.processedEffects._Checked.multiEffects)
+        check  ": foo ; : bla foo ( 'addition':[ n n -- n ] -- ) ' ;"  `shouldHave` (_Success._2._definedWords'.at "bla"._Just._ColonDefinition.processedEffects._Checked.multiEffects)
       it "with a word stack stack comment" $ 
-        check   ": bla ( 'addition':[ n n -- n ] -- xt:[ n n -- n ] ) ( 'addition':[ n n -- n ] -- ) ' ;" `shouldHave` (_Success._2.definedWords'.at "bla"._Just._ColonDefinition.processedEffects._Checked.multiEffects)
+        check   ": bla ( 'addition':[ n n -- n ] -- xt:[ n n -- n ] ) ( 'addition':[ n n -- n ] -- ) ' ;" `shouldHave` (_Success._2._definedWords'.at "bla"._Just._ColonDefinition.processedEffects._Checked.multiEffects)
 
   context "in an execute construct" $ 
     it "which is compiled" $ 
-      check  ": foo ; : bla foo ( Assert xt:[ n n -- n ] ) execute ;"  `shouldHave` (_Success._2.definedWords'.at "bla"._Just._ColonDefinition.processedEffects._Checked.multiEffects)  
+      check  ": foo ; : bla foo ( Assert xt:[ n n -- n ] ) execute ;"  `shouldHave` (_Success._2._definedWords'.at "bla"._Just._ColonDefinition.processedEffects._Checked.multiEffects)  
   
 
 immediate = do
   let check = fst . runChecker' defTestConfig
-      getColonDefEffects w program = preview (_Right._2.definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]
+      getColonDefEffects w program = preview (_Right._2._definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]
   it "postponing an immediate word just undoes the immediate nature" $ do
       let program = ": foo + ; immediate : bla postpone foo ;"
           effects1 :: Maybe [StackEffect]
@@ -555,9 +555,9 @@ main :: IO ()
 main = hspec $
   describe "runChecker'" $ do
     let check = fst . runChecker' defTestConfig
-        getCreateDefEffects w program = (preview (_Right._2.definedWords'.at w._Just._CreateDefinition) (check program) :: Maybe [StackEffect]) ^?! _Just
+        getCreateDefEffects w program = (preview (_Right._2._definedWords'.at w._Just._CreateDefinition) (check program) :: Maybe [StackEffect]) ^?! _Just
         getColonDefEffects w program =
-          preview (_Right._2.definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]
+          preview (_Right._2._definedWords'.at w._Just._ColonDefinition.processedEffects._Checked.multiEffects) (check program) :: Maybe [StackEffect]
 
 
     describe "Allow failure of colon definition type checking if it is not used:"  allowLocalFailureFeature

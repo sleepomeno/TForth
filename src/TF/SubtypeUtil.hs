@@ -19,7 +19,7 @@ import TF.Type.Nodes
 
 isSubtypeOf :: DataType -> DataType -> CheckerM Bool
 isSubtypeOf t1 t2 = do
-  subtypeRelationSet <- view subtypeRelation <$> getState :: CheckerM (S.Set (BasicType, BasicType))
+  subtypeRelationSet <- view _subtypeRelation <$> getState :: CheckerM (S.Set (BasicType, BasicType))
   if refDegree t1 == refDegree t2 then do
     let baseType1 = baseType t1  :: DataType
         baseType2 = baseType t2

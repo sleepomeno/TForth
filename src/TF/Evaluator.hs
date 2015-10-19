@@ -48,7 +48,7 @@ evalForthWordWithout ws         = do
             possWord                       <- noneOf' (map WordToken ws)
             (w,st) <- possWord & evalToken
 
-            modifyState (set stateVar st)
+            modifyState (set _stateVar st)
             return w
 
             
@@ -56,12 +56,12 @@ evalForthWordWithout ws         = do
 evalKnownWord                                       :: Word -> CheckerM  (ForthWord, SemState)
 evalKnownWord w' = do 
   s <- getState
-  let state'               = view stateVar s
-  let intSem               = w'^.interpretation               :: InterpretationSemantics
-      compSem              = w'^.compilation                  :: CompilationSemantics
-      definedExeSem        = w' ^. execution._Wrapped ^? _Sem :: Maybe Semantics
-      runtimeSem           = w' ^. runtime._Wrapped ^? _Sem   :: Maybe Semantics
-      intersect = w' ^. intersections
+  let state'               = view _stateVar s
+  let intSem               = w'^._interpretation               :: InterpretationSemantics
+      compSem              = w'^._compilation                  :: CompilationSemantics
+      definedExeSem        = w' ^. _execution._Wrapped ^? _Sem :: Maybe Semantics
+      runtimeSem           = w' ^. _runtime._Wrapped ^? _Sem   :: Maybe Semantics
+      intersect = w' ^. _intersections
 
   -- when (intersect ^. execEffect) $ undefined
 
@@ -69,16 +69,16 @@ evalKnownWord w' = do
               case intSem of
                 ADOPT_EXECUTION        -> return definedExeSem
                 IntSemDefined (Sem x)  -> return . Just $ x
-                _                      -> unexpected $ "Interpretation semantics not defined for " ++ view name w'
+                _                      -> unexpected $ "Interpretation semantics not defined for " ++ (w' ^. _nameW)
             else
               case compSem of
                 IMMEDIATE_EXECUTION    -> return  definedExeSem
                 CompSemDefined (Sem x) -> return . Just $ x
                 APPEND_EXECUTION       -> return definedExeSem
-                _                      -> unexpected $ "Compilation semantics not defined" ++ w' ^. name
+                _                      -> unexpected $ "Compilation semantics not defined" ++ (w' ^. _nameW)
               
 
-  modifyState (stateVar .~ fromMaybe state' (sem >>= view _semEnter))
+  modifyState (_stateVar .~ fromMaybe state' (sem >>= view _semEnter))
 
   let reverseStacks' = reverseEffects _Wrapped
                         
@@ -98,11 +98,11 @@ evalKnownWord w' = do
                         | isNothing runtimeSem -> intersect
                         | True -> intersect
 
-  let kw = ParsedWord (w' ^. parsed) (w' ^. name) singleSemantics (view _semEnter (fromJust sem)) newIntersect 
+  let kw = ParsedWord (w' ^. _parsedW) (w' ^. _nameW) singleSemantics (view _semEnter (fromJust sem)) newIntersect 
            -- & name .~ view name w'
            -- & parsed .~ view parsed w'
            -- & stacksEffects .~ singleSemantics
-           -- & intersections .~ newIntersect
+           -- & _intersections .~ newIntersect
            -- & enter .~ view _semEnter (fromJust sem)
 
   let args :: MaybeT (ParsecT [Token] ParseState StackEffectM) [DefiningOrNot]
@@ -123,22 +123,22 @@ evalKnownWord w' = do
 
   
   s <- getState
-  return (KnownWord (maybe kw id kw'), view stateVar s)
+  return (KnownWord (maybe kw id kw'), view _stateVar s)
   -- return  kw
           
 
   
 
 maybeColonDefinition :: Unknown -> ParseState -> Maybe ColonDefinitionProcessed
-maybeColonDefinition w' s   = preview (definedWords'.at (w' ^. _Wrapped)._Just._ColonDefinition) s-- & fmap (view _ColonDefinition)
--- maybeDefinition w' s   = view (definedWords'.at (w' ^. name)) s
+maybeColonDefinition w' s   = preview (_definedWords'.at (w' ^. _Wrapped)._Just._ColonDefinition) s-- & fmap (view _ColonDefinition)
+-- maybeDefinition w' s   = view (_definedWords'.at (w' ^. name)) s
 evalNonDefinition  =  UnknownE . Unknown . view _Wrapped
 
 evalColonDefinition :: ColonDefinitionProcessed -> CheckerM ForthWord
 evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
   s <- getState
   let (ColonDefinition _ (ColonDefinitionMeta colonName isCdefImmediate)) = colonDef
-  let st = view stateVar s
+  let st = view _stateVar s
       executed = st == INTERPRETSTATE || isCdefImmediate
       -- executed = st == INTERPRETSTATE || colonDef ^. meta.isImmediate
       -- colonName = colonDef ^. name
@@ -187,10 +187,10 @@ evalCreatedWord (Unknown ukName) = do
   parseState <- lift getState
   -- let maybeEffects = view (colonDefEffects.at ukName) parseState
   let maybeEffects :: Maybe [StackEffect]
-      maybeEffects = preview (definedWords'.at ukName._Just._CreateDefinition) parseState 
+      maybeEffects = preview (_definedWords'.at ukName._Just._CreateDefinition) parseState 
   effs <- hoistMaybe maybeEffects
   -- iop $ "ukname is '" ++ ukName ++ "'!"
-  let st = view stateVar parseState
+  let st = view _stateVar parseState
       executed = st == INTERPRETSTATE 
 
   let compiledOrExecuted = if executed  then
@@ -205,7 +205,7 @@ evalDefinedWord :: Unknown -> MaybeT CheckerM (ForthWord, SemState)
 evalDefinedWord uk = do
                       
      s <- lift getState
-     let state' = view stateVar s
+     let state' = view _stateVar s
      cDef@(ColonDefinitionProcessed definition effects) <- hoistMaybe $ maybeColonDefinition uk s
 
      -- when (isLeft definition') $
@@ -215,7 +215,7 @@ evalDefinedWord uk = do
 
      lift $ when (isImmediateColonDefinition definition) $ do
                input <- getInput
-               coreWords <- use wordsMap
+               coreWords <- use _wordsMap
                let lookupW w = fromJust $ M.lookup (WordIdentifier (Te.pack w)) coreWords
                -- let asdf :: Lens' (Either NameOfDefinition NameOfWord) (Either NameOfDefinition Word)
                --     asdf = undefined
@@ -237,7 +237,7 @@ evalDefinedWord uk = do
 evalUnknown :: Unknown -> CheckerM (ForthWord, SemState)
 evalUnknown uk =  do
   s <- getState
-  fmap fromJust . runMaybeT $ msum [evalDefinedWord uk, evalCreatedWord uk, return (evalNonDefinition uk, view stateVar s)]
+  fmap fromJust . runMaybeT $ msum [evalDefinedWord uk, evalCreatedWord uk, return (evalNonDefinition uk, view _stateVar s)]
 
 handleHOTstreamArgument :: DefiningOrNot -> Token -> CheckerM DefiningOrNot
 handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) possWord = do 
@@ -266,7 +266,7 @@ handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR ind
       iop $ render $ P.stackEffect eff
       
       s <- getState
-      let eff' = view (unresolvedArgsTypes.at index) s :: Maybe StackEffect
+      let eff' = view (_unresolvedArgsTypes.at index) s :: Maybe StackEffect
 
       -- iop $ "eff'"
       -- iop $ show arg
@@ -277,7 +277,7 @@ handleHOTstreamArgument arg@(Right (StreamArg (ArgInfo _ _ _ (Just (UnknownR ind
           unless isSubtype $ lift $ throwing _HOTNotSubtype ()
           return $ arg & _NotDefining._streamArgInfo._runtimeSpecified ?~ ResolvedR index eff''
         Nothing    -> do
-          let newState = s & (unresolvedArgsTypes.at index) ?~ eff
+          let newState = s & (_unresolvedArgsTypes.at index) ?~ eff
           putState newState
           -- TODO why not done?
           return $ arg & _NotDefining._streamArgInfo._runtimeSpecified ?~ ResolvedR index eff
@@ -303,7 +303,7 @@ resolveStreamArgs (x:xs) acc =  do
                 WordToken (Word Number _ _ _ _ _ _ _) -> throwing _NumberAsStreamArg ()
                 knownWord@(WordToken w) -> do
                   x' <- handleHOTstreamArgument x knownWord
-                  return (w ^?! (parsed._WordIdentifier.unpacked), x'))
+                  return (w ^?! (_parsedW._WordIdentifier.unpacked), x'))
           Just endDelimiter -> do
             result <- unwords <$> manyTill getNextParameter (parseUnknown endDelimiter)
             return (result, x)

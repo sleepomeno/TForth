@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, LambdaCase, MultiWayIf  #-}
+{-# LANGUAGE NoMonomorphismRestriction,FlexibleContexts,RankNTypes, LambdaCase, MultiWayIf  #-}
 
 module TF.Checker (
   checkNodes
@@ -6,7 +6,9 @@ module TF.Checker (
 
 import           Control.Arrow
 import           Control.Error            as E
-import           Control.Lens             hiding (noneOf, (??), _Empty)
+-- import           Control.Lens             hiding (noneOf, (??), _Empty)
+import Control.Lens (filtered,has,(^?!),only,(<<+=),imap,_Wrapped)
+import Lens.Simple
 import           Control.Monad.Error.Lens
 import           Control.Monad.Extra
 import           Control.Monad.Reader
@@ -34,7 +36,7 @@ checkNodes :: [Node] -> CheckerM ForthEffect
 checkNodes nodes = do
   mapM_ collectEffects nodes
 
-  view effects <$> getState
+  view _effects <$> getState
 
 zipzap effects = for effects $ \((oldComp,oldExec),(newComp,newExec)) -> ((oldComp, newComp), (oldExec, newExec))
 
@@ -66,16 +68,16 @@ removeWildcards effs = do
 resolveUnknownType :: Identifier -> DataType -> CheckerM ()
 resolveUnknownType identifier arg = blocked $ do
   iopW "RESOLVE UNKNOWN TYPES OF"
-  targets1 <- toListOf (definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isUnknownType) <$> getState 
-  targets2 <- toListOf (definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining._argType._Just) <$> getState 
-  targets3 <- toListOf (definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._after.traverse.filtered isUnknownType) <$> getState 
+  targets1 <- toListOf (_definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isUnknownType) <$> getState 
+  targets2 <- toListOf (_definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining._argType._Just) <$> getState 
+  targets3 <- toListOf (_definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._after.traverse.filtered isUnknownType) <$> getState 
   iopW . render . vcat . map P.dataType $ targets1 ++ targets2 ++ targets3
   iopW $ "REPLACE WITH: " ++ (render . P.dataType $ (arg, 0))
 
-  modifyState $ definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isUnknownType._1 %~ setBaseType arg
-  modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over _Just (first $ setBaseType arg)
-  modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._before.traverse.filtered isUnknownType._1 %~ setBaseType arg
-  modifyState $ classFields %~ imap (updateFields updateStackEffect)
+  modifyState $ _definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isUnknownType._1 %~ setBaseType arg
+  modifyState $ _definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over _Just (first $ setBaseType arg)
+  modifyState $ _definedWords'.traverse._ColonDefinition.processedEffects._Checked.multiEffects.traverse._before.traverse.filtered isUnknownType._1 %~ setBaseType arg
+  modifyState $ _classFields %~ imap (updateFields updateStackEffect)
   where
     isUnknownType = isCorrectCreatedWord identifier
     hasUnknownArgType x = has (_argType._Just) x && has _UnknownType (baseType (x ^?! _argType._Just._1))
@@ -88,12 +90,12 @@ updateFields updateStackEffect _ fields = for fields $ second (fmap updateStackE
 adjustDegree identifier diff = do
   blocked $ do
      iopW $ "CHANGE REFERENCE DEGREES BY " ++ show diff ++ " OF"
-     targets <- toListOf (definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isTarget) <$> getState
+     targets <- toListOf (_definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isTarget) <$> getState
      iopW . render . vcat . map P.dataType $ targets
-     modifyState $ definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
-  modifyState $ classFields %~ imap (updateFields updateStackEffect)
+     modifyState $ _definedWords'.traverse._CreateDefinition.traverse._after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
+  modifyState $ _classFields %~ imap (updateFields updateStackEffect)
 
-  -- l4 . modifyState $ definedWords'.traverse._ColonDefinition.processedEffects._Checked.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over (_Left._Just) ((!! diff) . iterate Reference)
+  -- l4 . modifyState $ _definedWords'.traverse._ColonDefinition.processedEffects._Checked.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over (_Left._Just) ((!! diff) . iterate Reference)
   where
     isUnknownType = isCorrectCreatedWord identifier
     isTarget = isUnknownType
@@ -116,7 +118,7 @@ collectEffects a = do
   -- iopC "Next:"
   -- iopC $ render $ P.forthWordOrExpr a
   stE2s <- (`runReaderT` (checkNodes, checkEffects, collectEffects)) $ either getStackEffects getStackEffects $ view nodeIso a
-  let config = defCheckEffectsConfig & forthWordOrExpr .~ Just a & isForcedAssertion .~ has (_Expr._Assert._2.only True) a
+  let config = def & forthWordOrExpr .~ Just a & isForcedAssertion .~ has (_Expr._Assert._2.only True) a
   flip runReaderT config $ checkEffects stE2s
   -- iopC $ show stE2s
 
@@ -126,7 +128,7 @@ checkEffects :: ForthEffect -> ReaderT CheckEffectsConfig CheckerM ()
 checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
 
   s <- lift getState
-  let (ForthEffect (realEffs, Intersections oldCompileI oldExecI)) = s ^. effects
+  let (ForthEffect (realEffs, Intersections oldCompileI oldExecI)) = s ^. _effects
 
   let effs' = zipzap $ liftM2 (,) realEffs stE2s
 
@@ -183,7 +185,7 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
 
   let errorInfo = do
         lift . lift . lift $ tell $ Info [] [CheckFailure realEffs stE2s] []
-        fwordOrExpr <- view forthWordOrExpr
+        fwordOrExpr <- asks (view forthWordOrExpr)
         when (has (_Just._Expr._Assert) fwordOrExpr) $
            lift . lift . lift $ tell $ Info [] [] [AssertFailure realEffs stE2s] 
 
@@ -218,7 +220,7 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
     throwing _Clash message
 
   -- lift $ modifyState $ set effects validEffects
-  lift $ modifyState $ effects._Wrapped._1 .~ validEffects
+  lift $ modifyState $ _effects._Wrapped._1 .~ validEffects
 
   updateIntersectionType nrOfOldCompEffs nrOfNewCompEffs _compileEffect oldCompileI newCompileI
   updateIntersectionType nrOfOldExecEffs nrOfNewExecEffs _execEffect oldExecI newExecI
@@ -228,13 +230,14 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
 -- moeglicherweise die compexeceffect-pairs wieder unzippen, um zu
 -- schauen, ob es unterschiedliche exec- oder comp-effekte oder beide gegeben hat
 
+updateIntersectionType :: Int -> Int -> (Lens' Intersections Bool) -> Bool -> Bool -> ReaderT CheckEffectsConfig CheckerM ()
 updateIntersectionType nrOfOldEffs nrOfNewEffs effLens oldI newI = 
   if | (nrOfOldEffs > 1 && nrOfNewEffs > 1) ->
-          lift $ modifyState $ effects._Wrapped._2.effLens .~ (oldI && newI)
+          lift $ modifyState $ _effects._Wrapped._2.effLens .~ (oldI && newI)
      | (nrOfOldEffs > 1 && nrOfNewEffs <= 1) -> 
-          lift $ modifyState $ effects._Wrapped._2.effLens .~ oldI
+          lift $ modifyState $ _effects._Wrapped._2.effLens .~ oldI
      | (nrOfOldEffs <= 1 && nrOfNewEffs > 1) -> 
-          lift $ modifyState $ effects._Wrapped._2.effLens .~ newI
+          lift $ modifyState $ _effects._Wrapped._2.effLens .~ newI
      | (nrOfOldEffs == 1 && nrOfNewEffs == 1) -> 
           return ()
     
@@ -259,9 +262,9 @@ handleArgs (Left arg) = do
     let currentType = view _argType arg :: (Maybe IndexedStackType)
 
     let typeOfArg = maybe (Left $ (Wildcard, Just 0)) Right currentType :: Either IndexedStackType IndexedStackType
-    uniqueId <- identifier <<+= 1
-    uniqueId2 <- identifier <<+= 1
-    uniqueId3 <- identifier <<+= 1
+    uniqueId <- _identifier <<+= 1
+    uniqueId2 <- _identifier <<+= 1
+    uniqueId3 <- _identifier <<+= 1
     -- let maybeRuntimeType = _Just.chosen.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe (Either [(StackEffect,StackEffect)] [(StackEffect,StackEffect)])
     -- let maybeRuntimeType = _Just.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
     let maybeRuntimeType = view _runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
@@ -291,7 +294,7 @@ handleArgs (Left arg) = do
 
                                   iop $ "defaulruntime is"
                                   iop $ show defaultRuntimeType
-                                  modifyState $ effects._Wrapped._1.traverse._1 .~ defaultRuntimeType'
+                                  modifyState $ _effects._Wrapped._1.traverse._1 .~ defaultRuntimeType'
                                   -- iopC "Current Effects"
 
                                   -- effs <- view realEffects <$> getState
@@ -302,9 +305,9 @@ handleArgs (Left arg) = do
                                   -- iopC "runtime effects"
                                   -- liftIO . mapM (putStrLn . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e)) $ runtimeEffects'
                                   iop "BEFORE"
-                                  flip runReaderT defCheckEffectsConfig $ checkEffects runtimeEffects'
+                                  flip runReaderT def $ checkEffects runtimeEffects'
                                   iop "AFTER"
-                                  result <- toListOf (effects._Wrapped._1.traverse._1) <$> getState
+                                  result <- toListOf (_effects._Wrapped._1.traverse._1) <$> getState
 
                                   result' <- replaceWrappers result
                                   
@@ -318,7 +321,7 @@ handleArgs (Left arg) = do
                                 return [defaultRuntimeType]
 
     when (has (_definingArgInfo._resolved._Just) arg) $
-      modifyState $ definedWords'.(at (arg ^?! _definingArgInfo._resolved._Just)) ?~ CreateDef runtimeType
+      modifyState $ (_definedWords'.(at (arg ^?! _definingArgInfo._resolved._Just))) ?~ CreateDef runtimeType
     -- let arg' =  arg & _argType .~ (either (const Nothing) Just typeOfArg) & runtimeChecked .~ checked
     let arg' =  arg & _argType .~ either (const Nothing) Just typeOfArg
     return $ Left $ arg'

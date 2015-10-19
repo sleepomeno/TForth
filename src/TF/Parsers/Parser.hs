@@ -38,10 +38,10 @@ import TF.Type.Nodes
 parseProgram :: CheckerM ([Node], ParseState)
 parseProgram = do
   coreWords <- lift W.coreWordsByIdentifier :: CheckerM (M.Map Parsable Word)
-  wordsMap .= coreWords  
+  _wordsMap .= coreWords  
   forthWordsOrExprs <- many parseNode
   st <- getState
-  let effs = toListOf (effects._Wrapped._1.traverse._2) st
+  let effs = toListOf (_effects._Wrapped._1.traverse._2) st
       allBeforesEmpty :: Bool
       allBeforesEmpty = all (null . view _before) effs
 
@@ -76,7 +76,7 @@ expression = (`runReaderT` env) $ parsePostpone </> try' parseIfElse </> try' pa
 
 parseWord :: Te.Text -> CheckerM ParsedWord
 parseWord w = do
-  coreWords <- use wordsMap
+  coreWords <- use _wordsMap
   let maybeWord = M.lookup (WordIdentifier w) coreWords
   when (isNothing maybeWord) $ throwing _Impossible ("Did not find word " <> Te.unpack w)
   let w'' = maybeWord ^?! _Just
@@ -90,7 +90,7 @@ isKnownWord              = do
   possWord <- anyToken
   s        <- getState
   let maybeColonDefinition' :: Unknown -> Maybe ColonDefinitionProcessed
-      maybeColonDefinition' (Unknown unknownName)   = preview (definedWords'.at unknownName._Just._ColonDefinition) s
+      maybeColonDefinition' (Unknown unknownName)   = preview (_definedWords'.at unknownName._Just._ColonDefinition) s
   -- maybeDefOrWord <- possWord & (_case & on _Unknown (\uk -> do 
   maybeDefOrWord <- case possWord of
     UnknownToken uk@(Unknown unknownName) -> do 
@@ -107,11 +107,11 @@ isKnownWord              = do
             return $ Right . DefinitionName $ y ^. colonDefinition.meta.name
 
     WordToken word -> do
-      if word ^. isImmediate then do 
-        (forthWord, _) <- evalKnownWord (word & isImmediate .~ False)
+      if word ^. _isImmediateWord then do 
+        (forthWord, _) <- evalKnownWord (word & _isImmediateWord .~ False)
         return $ Just . Left $ forthWord
       else 
-        return $ Just . Right . WordName . view name $ word
+        return $ Just . Right . WordName . view _nameW $ word
 
   iopP $ show maybeDefOrWord
   return maybeDefOrWord
@@ -158,7 +158,7 @@ prepareUnresolvedArgsTypes (sem, forced) = do
       case index' of
         Just index'' -> return index''
         Nothing      -> do
-          uniqueIdentifier <- lift $ identifier <<+= 1
+          uniqueIdentifier <- lift $ _identifier <<+= 1
           at index ?= uniqueIdentifier
           return uniqueIdentifier
       
@@ -168,17 +168,17 @@ parseStackEffectSemantics p = do
   iop $ "stackeffect-string:"
   iop $ stackEffect'
 
-  classes' <- views classInterfaces (map fst . M.toList) <$> getState
-  classes'' <- views classFields (map fst . M.toList) <$> getState
+  classes' <- views _classInterfaces (map fst . M.toList) <$> getState
+  classes'' <- views _classFields (map fst . M.toList) <$> getState
   dynamic <- view allowDynamicInStackComments
   effect''' <- handling _ParseErr' (unexpected . show) (lift $ p stackEffect' (defParseStackEffectsConfig & classNames .~ (classes' ++ classes'') & allowDynamicInStackComments .~ dynamic ))
   let effect' = getSemantics effect'''
   prepareUnresolvedArgsTypes effect'
   where
     getSemantics :: ParseEffectResult -> (Semantics, Bool)
-    getSemantics result = let streamArgs = view streamArguments result
+    getSemantics (ParseEffectResult parsedEffects streamArgs forcedEffect isIntersect) = let 
 
-                              effects' =  view parsedEffects result & traverse %~ (\(b,a) -> StackEffect (reverse b) streamArgs (reverse a))
+                              effects' =  parsedEffects  & traverse %~ (\(b,a) -> StackEffect (reverse b) streamArgs (reverse a))
                      in
-                       (def :: Semantics) & _semEffectsOfStack._Wrapped .~ effects'  & (, result ^. forcedEffect)
+                       (def :: Semantics) & _semEffectsOfStack._Wrapped .~ effects'  & (, forcedEffect)
 

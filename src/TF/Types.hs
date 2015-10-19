@@ -39,15 +39,6 @@ import qualified Data.Tree.Zipper as TreeZ
 --------------------------------------
 type SpacesDelimitedParsing = String
 
-data DataArgOrStreamArg dataArg = DataArg dataArg | NonDataArg DefiningOrNot deriving (Show, Eq)
-
-type StackArg = DataArgOrStreamArg [IndexedStackType]
-type StackArg' = DataArgOrStreamArg IndexedStackType 
-type StackArg'' = DataArgOrStreamArg IndexedStackType 
-
--- type DefiningOrNot' a = Either a a
-_Defining = _Left
-_NotDefining = _Right
 
 _RuntimeProcessed = _Left
 _RuntimeNotProcessed = _Right
@@ -77,10 +68,6 @@ _NoReferenceIndexed = prism id (\s -> case s of
                                   noref@(NoReference _, _) -> Right noref
                                   x -> Left x)
 
-type SingleSemiEffect = [StackArg]
-type SemiEffect = [SingleSemiEffect]
-
-
 data Optional = Sem Semantics | NotSet | Undefined deriving (Show,Eq)
 
 data CompilationSemantics  = CompSemDefined (Optional )
@@ -93,8 +80,8 @@ data InterpretationSemantics = IntSemDefined Optional
                                  deriving (Show, Eq)
 
 newtype ExecutionSemantics = ExecSem (Optional ) deriving (Show, Eq)
-
 newtype RuntimeSemantics = RunSem (Optional ) deriving (Show, Eq)
+
 
 data ColonDefinitionProcessed = ColonDefinitionProcessed {
     _cdefprocColonDefinition :: ColonDefinition
@@ -109,10 +96,10 @@ type StackEffectPair = (StackEffect, StackEffect)
 newtype ForthEffect = ForthEffect ([StackEffectPair], Intersections) deriving (Show, Eq)
   
 
-data FullStackEffect = FullStackEffect {
-    _fullstackeffectEffects :: MultiStackEffect
-  , _fullstackeffectIntersection :: Intersections
-       } deriving (Show, Eq)
+-- data FullStackEffect = FullStackEffect {
+--     _fullstackeffectEffects :: MultiStackEffect
+--   , _fullstackeffectIntersection :: Intersections
+--        } deriving (Show, Eq)
 
 data CheckEffectsConfig = CheckEffectsConfig {
   _checkconfigForthWordOrExpr :: Maybe Node
@@ -120,18 +107,16 @@ data CheckEffectsConfig = CheckEffectsConfig {
 , _checkconfigCheckState :: SemState
 }  deriving (Show)
 
-defCheckEffectsConfig = CheckEffectsConfig Nothing False INTERPRETSTATE
-
 
 data Word = Word {
-              _wordParsed :: Parsable
-            , _wordName :: String
-            , _wordRuntime :: RuntimeSemantics 
-            , _wordExecution :: ExecutionSemantics
-            , _wordCompilation :: CompilationSemantics
-            , _wordInterpretation :: InterpretationSemantics
-            , _wordIsImmediate :: Bool
-            , _wordIntersections :: Intersections
+              parsedW :: Parsable
+            , nameW :: String
+            , runtime :: RuntimeSemantics 
+            , execution :: ExecutionSemantics
+            , compilation :: CompilationSemantics
+            , interpretation :: InterpretationSemantics
+            , isImmediateWord :: Bool
+            , intersections :: Intersections
               } deriving (Show, Eq)
 
 
@@ -141,7 +126,6 @@ data StackEffectsWI = StackEffectsWI {
     stefwiMultiEffects :: [StackEffect]
   , stefwiIntersection :: Intersection } deriving (Show)
                           
--- data EffectsByPhase = Forced [StackEffect]
 data EffectsByPhase = Forced StackEffectsWI
                     -- | Checked ([StackEffect],Bool)
                     | Checked StackEffectsWI -- ([StackEffect],Bool)
@@ -164,30 +148,30 @@ newtype Trace = Trace {
 } deriving (Show,Eq)
 
 data ParseState = ParseState {
-                   _definedWords'        :: M.Map String Definition
-                 , _coreWords           :: M.Map Parsable Word
-                 , _stateVar            :: SemState
-                 , _currentCompiling :: Bool
-                 , _effects :: ForthEffect
+                   definedWords'        :: M.Map String Definition
+                 , coreWords           :: M.Map Parsable Word
+                 , stateVar            :: SemState
+                 , currentCompiling :: Bool
+                 , effects :: ForthEffect
 
-                 , _classInterfaces :: M.Map ClassName [(Method, OOMethodSem)]
-                 , _classFields :: M.Map ClassName [(Variable, OOFieldSem)]
-                 , _subtypeRelation :: S.Set (BasicType, BasicType)
-                 , _unresolvedArgsTypes :: M.Map Identifier StackEffect
-                 , _inputStreamAssertions :: [StackEffect]
-                 , _trace :: Trace
+                 , classInterfaces :: M.Map ClassName [(Method, OOMethodSem)]
+                 , classFields :: M.Map ClassName [(Variable, OOFieldSem)]
+                 , subtypeRelation :: S.Set (BasicType, BasicType)
+                 , unresolvedArgsTypes :: M.Map Identifier StackEffect
+                 , inputStreamAssertions :: [StackEffect]
+                 , trace :: Trace
                } deriving (Show)
-makeLenses ''ParseState
+makeLens ''ParseState
 
 data BuildState = BS { _state :: SemanticsState
                      , _word :: Word
                      } deriving (Show,Eq)
 
 data ParseEffectResult = ParseEffectResult {
-                             _parsedParsedEffects :: [([IndexedStackType], [IndexedStackType])]
-                           , _parsedStreamArguments :: [DefiningOrNot]
-                           , _parsedForcedEffect :: Bool
-                           , _parsedIsIntersection :: Bool
+                             parsedEffects :: [([IndexedStackType], [IndexedStackType])]
+                           , streamArguments :: [DefiningOrNot]
+                           , forcedEffect :: Bool
+                           , isIntersectionPER :: Bool
                            } deriving (Show,Eq)
 
 data WordDefinition cont = COMPILE_COMING cont
@@ -201,7 +185,6 @@ data WordDefinition cont = COMPILE_COMING cont
                          | DESCRIPTION String cont
                          | COMPILATION_START cont
                          | COMPILATION_END cont
-                         | REDEFINING_LATEST_CREATED String cont
                          | INTERPRETATION_START cont
                          | INTERPRETATION_END cont
                          | RUNTIME_START cont
@@ -226,27 +209,27 @@ data ParseConfig = ParseConfig {
 data SemanticsState = COMPILATION | EXECUTION | INTERPRETATION | RUNTIME deriving (Show,Read,Eq,Data,Typeable)
 
 data ParseStackEffectsConfig = ParseStackEffectsConfig {
- _stackeffClassNames :: [ClassName]
+   _stackeffClassNames :: [ClassName]
  , _stackeffOnlyAfter :: Bool
  , _stackeffAllowDynamicInStackComments :: Bool
 } deriving (Show,Eq)
 
   
 data CheckFailure = CheckFailure {
-  _checkCurrentEffects :: [CompExecEffect],
-  _checkNewEffects :: [CompExecEffect]
+  currentEffectsCheckFail :: [CompExecEffect],
+  newEffectsCheckFail :: [CompExecEffect]
 } deriving (Show,Eq)
 
 data AssertFailure = AssertFailure {
-  _assertfailCurrentEffects :: [CompExecEffect],
-  _assertfailNewEffects :: [CompExecEffect]
+  currentEffectsAssert :: [CompExecEffect],
+  newEffectsAssert :: [CompExecEffect]
 } deriving (Show,Eq)
   
 type Depth = Int
 data Info = Info {
-  _infoCheckedExpressions :: [(Node, Depth)]
-  , _infoFailures :: [CheckFailure]
-  , _infoAssertFailures :: [AssertFailure]
+    checkedExpressions :: [Node]
+  , infoFailures :: [CheckFailure]
+  , assertFailures :: [AssertFailure]
 
   } deriving (Show)
 
@@ -255,29 +238,28 @@ instance Monoid Info where
   mappend (Info exprs1 fails1 asserts1) (Info exprs2 fails2 asserts2) = Info (exprs1 ++ exprs2) (fails1 ++ fails2) (asserts1 ++ asserts2)
 
 data CustomState = CustomState {
-  _customIdentifier :: Int
-, _customDepth :: Int
-, _customWordsMap :: M.Map Parsable Word
+  identifier :: Int
+, wordsMap :: M.Map Parsable Word
 } deriving (Show,Eq)
 
 
 
 makeFields ''Trace
 makeWrapped ''Trace
-makeFields ''Info
+makeLens ''Info
 makeFields ''ParseStackEffectsConfig
-makeFields ''CustomState
+makeLens ''CustomState
 makeFields ''ColonDefinition
 makeFields ''ParseConfig
 makeFields ''CheckEffectsConfig
 makeFields ''ColonDefinitionProcessed
 makeWrapped ''ForthEffect
 makeLenses ''BuildState
-makeFields ''ParseEffectResult
+makeLens ''ParseEffectResult
 makeFields ''ParseState
 makePrisms ''EffectsByPhase
 makeFields ''StackEffectsWI
-makeFields ''Word
+makeLens ''Word
 makeTraversals ''Optional
 makeTraversals ''CompilationSemantics
 makeTraversals ''Definition
@@ -314,11 +296,6 @@ _CreateDefinition = _CreateDef
 
 emptyEffect = [StackEffect [] [] []]
 
-
-
-
-    
-  
         
 type Script'  = RWST ParseConfig () CustomState (ExceptT Error' (Writer Info)) 
 
@@ -327,11 +304,6 @@ type StackEffects = (StackEffect, StackEffect)
 
 type CheckerM = ParsecT [Token] ParseState StackEffectM 
 
-type CheckNodesT = ([Node] -> CheckerM ForthEffect)
-type CheckEffectsT = ForthEffect -> ReaderT CheckEffectsConfig CheckerM ()
-type CollectEffectsT = Node -> CheckerM ()
-
-type CheckerM' = ReaderT (CheckNodesT, CheckEffectsT, CollectEffectsT) CheckerM
 type StackRuleM = ExceptT SemState (ReaderT CheckEffectsConfig CheckerM)
 
 type ParseWord = Te.Text -> CheckerM ParsedWord
@@ -387,6 +359,8 @@ type ParseStackEffectsM = ParsecT String ParseStacksState (Reader ParseStackEffe
 instance HasDefault ParseStacksState where
   def = ParseStacksState forthTypes def [] False False 
 
+instance HasDefault CheckEffectsConfig where
+  def = CheckEffectsConfig Nothing False INTERPRETSTATE
 
 instance HasDefault ParseStackState where
   def = ParseStackState [] [] [] False

@@ -42,16 +42,14 @@ instance HasStackEffects Expr where
     getStackEffects w
 
   getStackEffects (Interpreted forthWordsOrExprs) = do
-    lift $ modifyState $ set currentCompiling False
-    lift $ depth += 1
+    lift $ modifyState $ set _currentCompiling False
     checkNodes <- view _1
     compExecEffs <- withEmpty' $ checkNodes forthWordsOrExprs
-    lift $ depth -= 1
-    lift $ modifyState $ set currentCompiling True
+    lift $ modifyState $ set _currentCompiling True
     return compExecEffs
 
   getStackEffects (Create create init does) = do
-    uniqueId <- identifier <<+= 1
+    uniqueId <- _identifier <<+= 1
 
 
     checkNodes <- view _1
@@ -62,7 +60,7 @@ instance HasStackEffects Expr where
           runMaybeT $ do
             c <- hoistMaybe comma
             lift $ checkNodes [c]
-          result <- view effects <$> getState
+          result <- view _effects <$> getState
 
           maybeDoes <- runMaybeT $ do
             exprs' <- hoistMaybe does
@@ -81,7 +79,6 @@ instance HasStackEffects Expr where
           return result'
   
     withEmpty' $ do
-      lift $ depth += 1
       cr <- checkNodes [create]
 
       maybeInitType <- runMaybeT $ (do
@@ -108,9 +105,8 @@ instance HasStackEffects Expr where
                       go (newCreating, init ^?! _Just._1, init ^? _Just._2, does)
 
       effs <- effectsOfState
-      iopC "Show effects of create:\n"
-      showEffs' effs
-      lift $ depth -= 1
+      -- iopC "Show effects of create:\n"
+      -- showEffs' effs
       return result
 
     where
@@ -165,7 +161,7 @@ instance HasStackEffects Expr where
     collectEffects <- view _3
     lift $ collectEffects (Expr $ Assert effects' False) -- TODO take forced from parsed assertion
 
-    uniqueIdentifier <- lift $ identifier <<+= 1
+    uniqueIdentifier <- lift $ _identifier <<+= 1
     -- let executeEffs = effsAsTuples $ compOrExec [eff & _before %~ ((Wildcard, Just uniqueIdentifier):)] 
     let executeEffs = effsAsTuples $ (effects' & chosen' .~ [eff & _before %~ ((Wildcard, Just uniqueIdentifier):)] )
 
@@ -215,8 +211,7 @@ instance HasStackEffects Expr where
     let isForced = has (_Just._2.filtered id) stackCommentEffects
     whenM (lift $ (isForced &&) <$> (not <$> view allowForcedEffects)) $ throwing _ForcedEffectsNotAllowed ()
 
-    lift $ modifyState $ set currentCompiling True
-    lift $ depth += 1
+    lift $ modifyState $ set _currentCompiling True
     checkNodes <- view _1
     (effs, compI) <- if isForced then
              return ((stackCommentEffects & view (_Just._1._semEffectsOfStack._Wrapped)), False)
@@ -272,7 +267,7 @@ instance HasStackEffects Expr where
 
     lift $ exportColonDefinition isForced colonName effs compI
 
-    lift $ modifyState $ set currentCompiling False
+    lift $ modifyState $ set _currentCompiling False
 
     return emptyForthEffect
 

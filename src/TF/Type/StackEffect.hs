@@ -11,6 +11,20 @@ type IndexedStackType = (DataType, Maybe Int)
 type Identifier = Int
 type ClassName = String
 
+
+data DataArgOrStreamArg dataArg = DataArg dataArg | NonDataArg DefiningOrNot deriving (Show, Eq)
+
+type StackArg = DataArgOrStreamArg [IndexedStackType]
+type StackArg' = DataArgOrStreamArg IndexedStackType 
+type StackArg'' = DataArgOrStreamArg IndexedStackType 
+type SingleSemiEffect = [StackArg]
+type SemiEffect = [SingleSemiEffect]
+
+
+-- type DefiningOrNot' a = Either a a
+_Defining = _Left
+_NotDefining = _Right
+
 data DataType = Dynamic
               | WildcardWrapper
               | Wildcard

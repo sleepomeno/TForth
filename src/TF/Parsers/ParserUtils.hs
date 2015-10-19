@@ -34,7 +34,7 @@ mzip (ma,mb) = do
 withTrace' p = mzip . (first withTrace) . munzip $ p
 
 withTrace p = do
-  let modState f = modifyState $ trace._Wrapped %~ f
+  let modState f = modifyState $ _trace._Wrapped %~ f
   modState $insert (Node "" []) . last . children
   result <- p
   modState $ modifyTree (\t -> t { rootLabel = render $ P.infoNode result })
@@ -124,9 +124,9 @@ parseUnknownName = do
 
 forbiddenInBranch :: ExpressionsM [Word]
 forbiddenInBranch = do
-  coreWords <- use wordsMap
+  coreWords <- use _wordsMap
   return $ catMaybes $ map (\w -> M.lookup (WordIdentifier w) coreWords) ["then", ";", "postpone"]
 
 (</>) = mplus 
 
-compOrExec' = lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then Executed else Compiled) <$> getState
+compOrExec' = lift $ views _stateVar (\sVar -> if sVar == INTERPRETSTATE then Executed else Compiled) <$> getState

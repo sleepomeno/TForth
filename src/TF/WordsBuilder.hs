@@ -33,10 +33,10 @@ setSemantics' :: Traversal' Optional b -> b -> BuildMonad ()
 setSemantics' l' sem = updateSemantics l' (const sem)
 
 semanticLens :: SemanticsState -> Traversal' Word Optional 
-semanticLens INTERPRETATION = interpretation._IntSemDefined
-semanticLens COMPILATION = compilation._CompSemDefined
-semanticLens EXECUTION = execution._Wrapped
-semanticLens RUNTIME = runtime._Wrapped
+semanticLens INTERPRETATION = _interpretation._IntSemDefined
+semanticLens COMPILATION = _compilation._CompSemDefined
+semanticLens EXECUTION = _execution._Wrapped
+semanticLens RUNTIME = _runtime._Wrapped
 
 addInfo (EFFECT_UNDEFINED c) = do
   setSemantics' id Undefined
@@ -44,17 +44,17 @@ addInfo (EFFECT_UNDEFINED c) = do
 
 addInfo (COMPILATION_START c) = do
   state .= COMPILATION
-  word.compilation .= CompSemDefined (Sem def)
+  word._compilation .= CompSemDefined (Sem def)
   c
 
 addInfo (RUNTIME_START c) = do
   state .= RUNTIME
-  word.runtime .= RunSem (Sem def)
+  word._runtime .= RunSem (Sem def)
   c
 
 addInfo (INTERPRETATION_START c) = do
   state .= INTERPRETATION
-  word.interpretation .= IntSemDefined (Sem def)
+  word._interpretation .= IntSemDefined (Sem def)
   c
 
 addInfo (COMPILATION_END c) = state .= EXECUTION >> c
@@ -64,15 +64,13 @@ addInfo (INTERPRETATION_END c) = state .= EXECUTION >> c
 addInfo (RUNTIME_END c) = state .= EXECUTION >> c
 
 addInfo (EFFECT e c) = do
-  parseResult <- lift . lift $ parseEffect e defParseStackEffectsConfig
-  let streamArgs' = view streamArguments parseResult
-      effects' =  view parsedEffects parseResult & traverse %~ (\(b,a) -> StackEffect b streamArgs' a)
-      isIntersect = view isIntersection parseResult
+  ParseEffectResult parsedEffects streamArgs forced isIntersect <- lift . lift $ parseEffect e defParseStackEffectsConfig
+  let effects' =  parsedEffects & traverse %~ (\(b,a) -> StackEffect b streamArgs a)
   st' <- use state
   if st' == EXECUTION then
-    word.intersections._execEffect .= isIntersect
+    word._intersections._execEffect .= isIntersect
   else
-    word.intersections._compileEffect .= isIntersect
+    word._intersections._compileEffect .= isIntersect
 
   shouldDoDynTransform <- view allCoreDynamic
   let effects'' = if shouldDoDynTransform then
@@ -91,19 +89,19 @@ addInfo (DESCRIPTION d' c) = do
   setSemantics' (_Sem._semDescription) d'
   c
 
-addInfo (NAME n' c) = word.name .= n'  >> c
+addInfo (NAME n' c) = word._nameW .= n'  >> c
 addInfo (ENTER s c) = do
   setSemantics' (_Sem._semEnter) (Just s)
   c
 
-addInfo (IMMEDIATE c) = word.isImmediate .= True  >> c
-addInfo (PARSED_STR p c) = word.parsed .= WordIdentifier p  >> c
-addInfo (PARSED_NUM c) = word.parsed .= Number  >> c
+addInfo (IMMEDIATE c) = word._isImmediateWord .= True  >> c
+addInfo (PARSED_STR p c) = word._parsedW .= WordIdentifier p  >> c
+addInfo (PARSED_NUM c) = word._parsedW .= Number  >> c
          
 addTypeIndices effects = do
   transformedEffects <- do
     let addTypeIndex Nothing = do
-          newId <- lift . lift $ identifier <<+= 1
+          newId <- lift . lift $ _identifier <<+= 1
           return $ Just newId
         addTypeIndex x = return x
           
@@ -146,14 +144,14 @@ buildWord' w = do
 
 postProcess :: BuildMonad () 
 postProcess = do
-  int <- use (word.interpretation)
-  comp <- use (word.compilation)
+  int <- use (word._interpretation)
+  comp <- use (word._compilation)
   when (int ^?! _IntSemDefined == NotSet) $
-    word.interpretation .= ADOPT_EXECUTION
+    word._interpretation .= ADOPT_EXECUTION
   when (comp ^?! _CompSemDefined == NotSet) $ do
-    immediate' <- use $ word.isImmediate
-    word.compilation .= if immediate' then IMMEDIATE_EXECUTION else APPEND_EXECUTION
-  wordName <- use (word.name)
-  wordParsed <- use (word.parsed._WordIdentifier)
+    immediate' <- use $ word._isImmediateWord
+    word._compilation .= if immediate' then IMMEDIATE_EXECUTION else APPEND_EXECUTION
+  wordName <- use (word._nameW)
+  wordParsed <- use (word._parsedW._WordIdentifier)
   when (null wordName) $
-     word.name .= Te.unpack wordParsed
+     word._nameW .= Te.unpack wordParsed

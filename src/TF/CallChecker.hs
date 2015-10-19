@@ -57,7 +57,7 @@ runChecker' conf s = do
          c :: StackEffectM ([Node], ParseState)
          c = lift . hoistEither =<< b
          -- d :: Script' (([Node], ParseState), ())
-         d = evalRWST c conf (CustomState 0 0 M.empty)
+         d = evalRWST c conf (CustomState 0 M.empty)
          e :: (Either Error' ([Node], ParseState), Info)
          -- e = return . runIdentity . runWriterT $ runEitherT $ fmap fst $ flip runReaderT conf $ d
          e = runIdentity . runWriterT $ runExceptT $ fmap fst $ d
@@ -66,7 +66,7 @@ runChecker' conf s = do
      runProgramParser :: String -> StackEffectM (Either ParseError ([Node], ParseState))
      runProgramParser s = do
        words' <- parseWords s
-       runParserT parseProgram (defParseState & subtypeRelation .~ subtypeRelation' primitiveTypes (conf ^. subtypes)) "" words'
+       runParserT parseProgram (defParseState & _subtypeRelation .~ subtypeRelation' primitiveTypes (conf ^. subtypes)) "" words'
      -- showInfo :: Info -> IO ()
 
 defParseState :: ParseState
@@ -86,13 +86,13 @@ runChecker config s = do
      showResult :: ([Node], ParseState) -> IO ()
      showResult (_, parseState) = do
        let checkerState = showCheckerState parseState
-           effs = showEffects' . view (effects._Wrapped._1) $ parseState
-       putStrLn . drawTree . toTree . view (trace._Wrapped) $ parseState
+           effs = showEffects' . view (_effects._Wrapped._1) $ parseState
+       putStrLn . drawTree . toTree . view (_trace._Wrapped) $ parseState
        putStrLn checkerState
        putStrLn effs
      showInfo :: Info -> IO ()
      showInfo (Info fexprs failures asserts) = do
-       let docs = for fexprs $ \(fexpr, depth) -> nest depth (P.infoNode fexpr)
+       let docs = for fexprs $ \fexpr -> nest 0 (P.infoNode fexpr)
            info = text "INFO:" $+$ nest 1 (vcat docs)
            failure = text "FAILURES:" $+$ nest 1 (vcat . map P.checkFailure $ failures)
            assert = text "ASSERT FAILURES:" $+$ nest 1 (vcat . map P.assertFailure $ asserts)

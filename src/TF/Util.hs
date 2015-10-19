@@ -7,6 +7,7 @@ import Control.Monad.State
 import Lens.Family.Total hiding ((&))
 import Control.Monad.Writer
 import Control.Lens
+import  Text.PrettyPrint (render)
 import           Control.Error as E
 import TF.Types hiding (isSubtypeOf)
 import TF.HandleDegrees
@@ -102,8 +103,7 @@ labeled = flip label
 
 tellExpr :: Node -> CheckerM ()
 tellExpr expr = do
-  d <- use depth
-  lift . lift $ tell (Info [(expr, d)] [] [])
+  lift . lift $ tell (Info [expr] [] [])
 
 
 resolveRuntimeType :: [(UniqueArg, StackEffect)] -> IndexedStackType -> IndexedStackType
@@ -133,7 +133,7 @@ getNextParameter = do
   return . possWordAsString $ w
 
 possWordAsString :: Token -> String
-possWordAsString = either (view _Wrapped) (Te.unpack . view (parsed._WordIdentifier)) . view tokenIso
+possWordAsString = either (view _Wrapped) (Te.unpack . view (_parsedW._WordIdentifier)) . view tokenIso
 
 parseUnknown :: String -> CheckerM Unknown
 parseUnknown n = do
@@ -149,3 +149,8 @@ sealed p = do
   
 
 is pr = isRight . matching pr
+
+
+-- showEffs'' =  mapM (iop . (\(c,e) -> render $ stackEffect c $+$ stackEffect e))
+-- showEffs' =  mapM (iop . render . stackEffect)
+-- showEff =  iop . render . stackEffect

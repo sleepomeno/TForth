@@ -66,11 +66,11 @@ parseTick = do
 parseInterpreted :: ExpressionsM Expr
 parseInterpreted = do
   parseWordLeftBracket
-  lift $ modifyState $ set currentCompiling False
+  lift $ modifyState $ set _currentCompiling False
   parseNode <- view parseNode'
   expr <- lift $ manyTill parseNode (parseUnknown "]")
-  lift $ modifyState $ set currentCompiling True
-  lift $ modifyState (stateVar .~ COMPILESTATE)
+  lift $ modifyState $ set _currentCompiling True
+  lift $ modifyState (_stateVar .~ COMPILESTATE)
   return $ Interpreted expr
 
 parseColon :: ExpressionsM Expr
@@ -82,7 +82,7 @@ parseColon = do
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   stackComment <- lift $ optionMaybe $ parseStackEffectSemantics parseEffect
   
-  lift $ modifyState $ set currentCompiling True
+  lift $ modifyState $ set _currentCompiling True
 
   let parseColonDefinitionBody :: ExpressionsM (ColonDefinition, [Node])
       parseColonDefinitionBody = do 
@@ -97,10 +97,10 @@ parseColon = do
   let parseBody :: ExpressionsM Expr
       parseBody = do
         (colonDefinition, expr) <- parseColonDefinitionBody 
-        lift $ modifyState (over definedWords' $ M.insert w (ColDef (ColonDefinitionProcessed colonDefinition NotChecked)))
+        lift $ modifyState (over _definedWords' $ M.insert w (ColDef (ColonDefinitionProcessed colonDefinition NotChecked)))
         -- modifyState (over definedWords $ M.insert w colonDefinition)
         -- modifyState (lastColonDefinition ?~ w)
-        lift $ modifyState $ set currentCompiling False
+        lift $ modifyState $ set _currentCompiling False
         return $ (createColon colonDefinition) w stackComment expr
 
   let typeCheckingFails :: String -> ExpressionsM Expr
@@ -115,8 +115,8 @@ parseColon = do
   
         env <- ask
         (colonDefinition, expr) <- lift $ local (typeCheck .~ False) $ flip runReaderT env $ parseColonDefinitionBody
-        lift $ modifyState (over definedWords' $ M.insert w (ColDef(ColonDefinitionProcessed colonDefinition (Failed reason))))
-        lift $ modifyState $ set currentCompiling False
+        lift $ modifyState (over _definedWords' $ M.insert w (ColDef(ColonDefinitionProcessed colonDefinition (Failed reason))))
+        lift $ modifyState $ set _currentCompiling False
         return $ ColonExprClash w stackComment
 
   catches parseBody (errorHandler typeCheckingFails w)

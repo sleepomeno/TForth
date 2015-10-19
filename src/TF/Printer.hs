@@ -2,7 +2,7 @@
 module TF.Printer where
 
 import Prelude hiding (Word)
-import  Text.PrettyPrint ((<+>),($+$),text,Doc,vcat,nest,hsep)
+import  Text.PrettyPrint ((<+>),($+$),text,Doc,vcat,nest,hsep,render)
 import  Text.Show.Pretty (ppDoc)
 import Lens.Family.Total hiding ((&))
 import           TF.Types hiding (word, forthWordOrExpr)
@@ -12,6 +12,7 @@ import Data.Monoid
 import Data.Maybe
 import TF.Util (nodeIso, tokenIso,compOrExecIso)
 
+import Debug.Trace
 import TF.ForthTypes
 import TF.Type.StackEffect
 import TF.Type.Nodes
@@ -35,7 +36,7 @@ unknown :: Unknown -> Doc
 unknown (Unknown name) = text "Unknown named:" <+> text name
 
 wordSemantics :: Word -> Doc
-wordSemantics w = text "Word:" <+> text (view name w)
+wordSemantics w = text "Word:" <+> text (w ^. _nameW)
 
 compiledOrExecuted :: CompiledOrExecuted MultiStackEffect -> Doc
 compiledOrExecuted effs = case effs of
@@ -256,3 +257,4 @@ colonDefinition'' (ColonDefinition _ (ColonDefinitionMeta n _)) = text ("COLON_D
 
 realtype :: PrimType -> Doc
 realtype (PT x _ _ _ ) = text (show x)
+

@@ -44,9 +44,9 @@ parseNoName = do
 
   let parseNonameBody :: ExpressionsM (Either [Node] [Node])
       parseNonameBody = do
-        lift $ modifyState $ set stateVar COMPILESTATE
+        lift $ modifyState $ set _stateVar COMPILESTATE
         exprs <- Right <$> manyWordsTill ";"
-        lift $ modifyState $ set stateVar INTERPRETSTATE
+        lift $ modifyState $ set _stateVar INTERPRETSTATE
         return exprs
 
       typeCheckingFails :: String -> ExpressionsM (Either [Node] [Node])
@@ -54,7 +54,7 @@ parseNoName = do
         iopP "typecheckingfails"
         env <- ask
         lift $ local (typeCheck .~ False) $ (`runReaderT` env) parseNonameBody
-        lift $ modifyState $ set stateVar INTERPRETSTATE
+        lift $ modifyState $ set _stateVar INTERPRETSTATE
         return $ Left []
 
   expr <- catches parseNonameBody (errorHandler typeCheckingFails ":Noname implementation")
@@ -117,7 +117,7 @@ checkMethods newClass oldClass methods = do
       where
         checkEff :: StackEffect -> ExpressionsM ()
         checkEff eff = void $ lift $ runMaybeT $ do
-              superclassMethod' <- lift $ preview (classInterfaces.at oldClass._Just.traverse.filtered (\(m, _) -> m == methodName))<$> getState  
+              superclassMethod' <- lift $ preview (_classInterfaces.at oldClass._Just.traverse.filtered (\(m, _) -> m == methodName))<$> getState  
               superclassMethodEffects <- (getEffsOfMethod . view _2) <$> hoistMaybe superclassMethod'
               forM_ superclassMethodEffects $ \superclassMethodEff -> do
                 isSubtype' <- lift $ eff `effectIsSubtypeOf` superclassMethodEff
@@ -137,15 +137,15 @@ getEffsOfMethod oomethodsem =
 
 getNonOverwrittenMethods :: ClassName -> [Method] -> ExpressionsM [(Method, OOMethodSem)]
 getNonOverwrittenMethods oldClass methods = do
-  toListOf (classInterfaces.at oldClass._Just.traverse.filtered (\(m, _) -> m `notElem` methods)) <$> (lift getState) :: ExpressionsM [(Method, OOMethodSem)]
+  toListOf (_classInterfaces.at oldClass._Just.traverse.filtered (\(m, _) -> m `notElem` methods)) <$> (lift getState) :: ExpressionsM [(Method, OOMethodSem)]
   
 parseClass :: ExpressionsM Expr
 parseClass = do
   oldClass <- parseClassName
   parseKeyword "class"
-  uniqueIdentifier <- lift $ identifier <<+= 1
-  uniqueIdentifier' <- lift $ identifier <<+= 1
-  uniqueIdentifier'' <- lift $ identifier <<+= 1
+  uniqueIdentifier <- lift $ _identifier <<+= 1
+  uniqueIdentifier' <- lift $ _identifier <<+= 1
+  uniqueIdentifier'' <- lift $ _identifier <<+= 1
   env <- ask
   let runExpression = (`runReaderT` env)
   variables' <- lift $ many (try (runExpression parseVariable))
@@ -166,37 +166,37 @@ parseClass = do
 
   superclassMethodsNotOverwritten <- getNonOverwrittenMethods oldClass (methods ^.. traverse._1)
   
-  lift $ modifyState $ over classInterfaces (M.insert className (methods ++ superclassMethodsNotOverwritten))
+  lift $ modifyState $ over _classInterfaces (M.insert className (methods ++ superclassMethodsNotOverwritten))
   fieldsOfSuperclass <- getFieldsOfClass oldClass
-  lift $ modifyState $ over classFields (M.insert className (variables ++ fieldsOfSuperclass))
+  lift $ modifyState $ over _classFields (M.insert className (variables ++ fieldsOfSuperclass))
 
-  lift $ modifyState $ over subtypeRelation (S.insert (ClassType className, ClassType oldClass))
-  lift $ modifyState $ over subtypeRelation (S.insert (ClassType className, ClassType className))
+  lift $ modifyState $ over _subtypeRelation (S.insert (ClassType className, ClassType oldClass))
+  lift $ modifyState $ over _subtypeRelation (S.insert (ClassType className, ClassType className))
   
 
   return $ OOPExpr $ Class className variables methods oldClass
 
 
 getFieldsOfClass :: ClassName -> ExpressionsM [(Variable, OOFieldSem)]
-getFieldsOfClass clazz = toListOf (classFields.at clazz._Just.traverse) <$> (lift getState) :: ExpressionsM [(Variable, OOFieldSem)]
+getFieldsOfClass clazz = toListOf (_classFields.at clazz._Just.traverse) <$> (lift getState) :: ExpressionsM [(Variable, OOFieldSem)]
 
 parseNewObject :: ExpressionsM Expr
 parseNewObject = do
   clazz <- parseClassName
   parseKeyword "new"
-  -- compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then Right else Left) <$> getState
+  -- compOrExec <- lift $ views _stateVar (\sVar -> if sVar == INTERPRETSTATE then Right else Left) <$> getState
   compOrExec <- compOrExec'
   return $ OOPExpr $ NewObject $ compOrExec $ clazz
 
 isMethod :: String -> ExpressionsM Bool
 isMethod method = do
-  keysValues <- lift $ views classInterfaces M.toList <$> getState
+  keysValues <- lift $ views _classInterfaces M.toList <$> getState
   let filtered = filter (\(_, methods) -> any (\(x,_) -> x == method) methods) keysValues :: [(ClassName, [(Method, OOMethodSem)])]
   return . not . null $ filtered
 
 isField :: String -> ExpressionsM Bool
 isField field = do
-  keysValues <- lift $ views classFields M.toList <$> getState
+  keysValues <- lift $ views _classFields M.toList <$> getState
   let filtered = filter (\(_, fields) -> any (\(x,_) -> x == field) fields) keysValues :: [(ClassName, [(Variable, OOFieldSem)])]
   return . not . null $ filtered
 
@@ -207,7 +207,7 @@ parseFieldCall = do
   isField' <- isField fieldName
   guard isField'
   compOrExec <- compOrExec'
-  -- compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  -- compOrExec <- lift $ views _stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
   return . OOPExpr . FieldCall . compOrExec $ fieldName
 
 parseMethodCall :: ExpressionsM Expr
@@ -215,14 +215,14 @@ parseMethodCall = do
   methodName <- parseUnknownName
   isMethod' <- isMethod methodName
   guard isMethod'
-  -- compOrExec <- lift $ views stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
+  -- compOrExec <- lift $ views _stateVar (\sVar -> if sVar == INTERPRETSTATE then new _Executed else new _Compiled) <$> getState
   compOrExec <- compOrExec'
   return .  OOPExpr . MethodCall . compOrExec $ methodName
 
 
 parseSuperclassMethodCall :: ExpressionsM Expr
 parseSuperclassMethodCall = do
-  isInDefinition <- lift $ views stateVar (== COMPILESTATE) <$> getState
+  isInDefinition <- lift $ views _stateVar (== COMPILESTATE) <$> getState
   parseWordLeftBracket
   clazz <- parseUnknownName
   parseKeyword "::"
@@ -236,7 +236,7 @@ parseClassName :: ExpressionsM String
 parseClassName = do
   className <- parseUnknownName
   s <-  lift getState
-  let isClassKnown = getAny $ views (classInterfaces.to M.keys.traverse) (Any . (== className)) s 
+  let isClassKnown = getAny $ views (_classInterfaces.to M.keys.traverse) (Any . (== className)) s 
   when (not isClassKnown) $ iopP $ "Class " ++ className ++ " is unknown!"
   guard isClassKnown
   return className
@@ -246,7 +246,7 @@ parseMethodName :: ClassName -> ExpressionsM String
 parseMethodName className = do
   methodName <- parseUnknownName
   s <- lift getState
-  let isMethodKnown = getAny $ views (classInterfaces.ix className.traverse._1)
+  let isMethodKnown = getAny $ views (_classInterfaces.ix className.traverse._1)
                                      (Any . (== methodName)) s
   when (not isMethodKnown) $ iopP $ "Method " ++ methodName ++ " is not a method of class " ++ className
   guard isMethodKnown

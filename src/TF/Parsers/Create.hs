@@ -33,7 +33,7 @@ parseCreating = do
          
          -- iopP $ "Is an unknown named " ++ (view name uk)
          (forthWord, newState) <- evalUnknown uk
-         modifyState (set stateVar newState)
+         modifyState (set _stateVar newState)
 
          -- iopP $ render . P.forthWord $ forthWord
          unless (has _DefE forthWord) $ fail "not a defE"
@@ -87,7 +87,7 @@ parseDoes = do
 
 parseStoringValue  = do
   forbidden' <- forbiddenInBranch
-  coreWords <- lift $ use wordsMap
+  coreWords <- lift $ use _wordsMap
   let commaDoes = mapMaybe (\w -> M.lookup (WordIdentifier w) coreWords) [",",  "does>"]
   let forbidden = commaDoes ++ forbidden'
   parseNodeWithout <- view parseNodeWithout'

@@ -44,7 +44,7 @@ getStackEffects' (NewObject cOrE) = do
 getStackEffects' (SuperClassMethodCall className method) = do
     let getEffs :: [(Method, OOMethodSem)] -> [StackEffect]
         getEffs methods = concatMap (\(_, methodSem) -> case methodSem of { InferredByMethod (effs, _) -> effs ; ByDefinition (effs, _) -> effs }) $ filter (\(x,_) -> x == method)  methods
-    effs <- lift $ views classInterfaces (getEffs . fromJust . M.lookup className) <$> getState -- :: CheckerM [StackEffect]
+    effs <- lift $ views _classInterfaces (getEffs . fromJust . M.lookup className) <$> getState -- :: CheckerM [StackEffect]
     return $ withoutIntersect $ effsAsTuples $ (Compiled effs)
 
 getStackEffects' (MethodCall cOrE) = do
@@ -79,13 +79,13 @@ getStackEffects' (NoNameClash stackCommentEffects clazz method) = do
     noDoubleDefinition method definedEffByClass' stackCommentEffects
     effs <- if | isForced -> do
                    let forcedEffs = stackCommentEffects ^?! (_Just._1)
-                   lift $ modifyState $ classInterfaces.ix clazz.traverse.filtered (\(method', _) -> method == method')._2 .~ InferredByMethod (forcedEffs, True)
+                   lift $ modifyState $ _classInterfaces.ix clazz.traverse.filtered (\(method', _) -> method == method')._2 .~ InferredByMethod (forcedEffs, True)
 
                    return (stackCommentEffects & view (_Just._1))
                | (has (_Just._2.only True) definedEffByClass') -> return (definedEffByClass' & view (_Just._1))
                | otherwise -> throwing (_OOPErrT . _Clash) ("Error in method '" <> method <> "' of class '" <> clazz)
 
-    lift $ modifyState $ set currentCompiling False
+    lift $ modifyState $ set _currentCompiling False
     return emptyForthEffect
 
 getStackEffects' (NoName stackCommentEffects exprs clazz method) = do
@@ -108,7 +108,7 @@ getStackEffects' (NoName stackCommentEffects exprs clazz method) = do
 
     effs <- if | isForced -> do
                    let forcedEffs = stackCommentEffects'' ^?! (_Just._1)
-                   lift $ modifyState $ classInterfaces.ix clazz.traverse.filtered (\(method', _) -> method == method')._2 .~ InferredByMethod (forcedEffs, True)
+                   lift $ modifyState $ _classInterfaces.ix clazz.traverse.filtered (\(method', _) -> method == method')._2 .~ InferredByMethod (forcedEffs, True)
 
                | otherwise -> (do
                 (ForthEffect (compExecEffects, _)) <- withEmpty' $ checkNodes exprs
@@ -122,7 +122,7 @@ getStackEffects' (NoName stackCommentEffects exprs clazz method) = do
 
                 let checkClassTypeArgument :: StackEffect -> CheckerM StackEffect
                     checkClassTypeArgument eff = do
-                      uniqueIdentifier <- identifier <<+= 1
+                      uniqueIdentifier <- _identifier <<+= 1
                       let topConsumingType = preview (_before._head) eff :: Maybe IndexedStackType
                           classType = (NoReference $ ClassType clazz, Just uniqueIdentifier)
                       case topConsumingType of
@@ -180,10 +180,10 @@ getStackEffects' (NoName stackCommentEffects exprs clazz method) = do
                         else
                           lift . lift $ throwing (_OOPErrT . _NotMatchingStackComment) prettyMethod
 
-                lift $ modifyState $ classInterfaces.ix clazz.traverse.filtered (\(method', _) -> method == method')._2 .~ InferredByMethod (effs, False))
+                lift $ modifyState $ _classInterfaces.ix clazz.traverse.filtered (\(method', _) -> method == method')._2 .~ InferredByMethod (effs, False))
 
 
 
-    lift $ modifyState $ set currentCompiling False
+    lift $ modifyState $ set _currentCompiling False
 
     return emptyForthEffect

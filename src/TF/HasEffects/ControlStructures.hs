@@ -1,6 +1,7 @@
 {-# LANGUAGE  FlexibleContexts  #-}
 
 module TF.HasEffects.ControlStructures where
+
 import           Control.Error            as E
 import           Control.Lens             hiding (noneOf, (??), _Empty)
 import           Control.Monad.Error.Lens
@@ -21,6 +22,7 @@ import TF.Errors
 import TF.CheckerUtils
 import TF.Type.StackEffect
 import TF.Type.Nodes
+import TF.HasEffects.HasStackEffects
 
 getStackEffects' (IfElseExpr thens elses) = do
     -- lift $ depth += 1
@@ -55,9 +57,9 @@ getStackEffects' (IfElseExpr thens elses) = do
         return $ res1) elseEff) thenEff
       return $ msum [(guard guard1) >> Just thenEff, (guard guard2) >> Just elseEff] 
 
-    iop $ "show maybecommentype: " <> (show $ isNothing maybeCommonType)
-    when (isJust maybeCommonType) $ void $
-       showEffs (fromJust maybeCommonType)
+    -- iop $ "show maybecommentype: " <> (show $ isNothing maybeCommonType)
+    -- when (isJust maybeCommonType) $ void $
+    --    showEffs (fromJust maybeCommonType)
 
     when (forbidMultiEffs && isNothing maybeCommonType) $
       lift $ throwing (_TypeClashM . _IfElseExprNotStatic) ("IF_BRANCH: " <> showEffects thenEff, "ELSE_BRANCH: " <> showEffects elseEff)
