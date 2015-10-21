@@ -82,8 +82,6 @@ exportColonDefinition isForced colonName effs' compI = do
     forbidMulti <- views allowMultipleEffects not
     let effs = nub effs'
     checkResult <- if (length effs > 1 && forbidMulti) then do
-                     iop $ "THESE ARE THE MULTI EFFS"
-                     -- showEffs' effs
                      maybeCommon <- getCommonSupertype'' (map (:[]) effs)
                      case maybeCommon of
                        Just effs -> return $ modifier effs
@@ -199,36 +197,6 @@ flag'' = do
   id <- _identifier <<+= 1
   return $ (NoReference $ PrimType FT.flag, Just id)
 
--- effectMatches' :: (StackEffect, Intersections) -> (StackEffect, Intersections) -> CheckerM' Bool
--- -- effectMatches' (eff1, int1) (eff2, int2)  = handling _TypeClash (const $ return False) $ withEmpty' $ do
--- effectMatches' (eff1, int1) (eff2, int2) = handling _TypeClash (const $ return False) $ withEmpty''' $ do
--- -- effectMatches' (eff1, int1) (eff2, int2) = withEmpty' $ do
--- -- effectMatches' (eff1, int1) (eff2, int2)  = _hand $ withEmpty' $ do
---   let before' = StackEffect [] [] (eff1 ^. _before)
---       after' = StackEffect (eff1 ^. _after) [] []
---   checkEffects <- view _2 
---   lift $ (`runReaderT` defCheckEffectsConfig) $ do
---     checkEffects $ withIntersect int1 [(before', StackEffect [] [] [])]
---     checkEffects $ withIntersect int2 [(eff2, StackEffect [] [] [])]
---     checkEffects $ withIntersect int1 [(after', StackEffect [] [] [])]
---   s <-  lift getState
---   let eff = map fst (s ^. _effects._Wrapped._1)
---   -- iop "Das sind die effekte:"
---   -- iop $ show eff
-
-
-
---   -- iop " eff1"
---   -- showEffs' [eff1]
---   -- iop $ "constraints eff1"
-
---   -- mapM (iop . show) (constraints eff1)
---   -- iop $ "constraints eff2"
---   -- mapM (iop . show) (constraints eff2)
-
-  
---   return $ (all (`elem` constraints eff2) $ constraints eff1) &&  ((==0) . length . filter (not . (\eff -> eff ^. _before == [] && eff ^. _after == [])) $ eff)
-
 showEffects = unlines . map (render . P.stackEffectNice . fst)
 
 showClasses :: ParseState -> String
@@ -249,33 +217,3 @@ showDefinitions st =
   "DICTIONARY:\n\n" ++ (unlines . map (++ "\n") . map (\(name,y) -> case y of 
                                       ColDef x -> showColonDefinition name x
                                       CreateDef x -> showCreate name x) $ keysValues)
-
-
--- showEffs =  mapM (iop . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e))
--- showEffs' =  mapM (iop . render . P.stackEffect)
--- showEff =  iop . render . P.stackEffect
-
--- effectMatches :: StackEffect -> StackEffect -> CheckerM' Bool
--- effectMatches eff1 eff2 = handling _TypeClash (const $ return False) $ withEmpty''' $ do
---   let before' = StackEffect [] [] (eff1 ^. _before)
---       after' = StackEffect (eff1 ^. _after) [] []
---   checkEffects' <- view _2 :: CheckerM' CheckEffectsT
---   lift $ (`runReaderT` defCheckEffectsConfig) $ do
---     checkEffects' $ withoutIntersect [(before', StackEffect [] [] [])]
---     checkEffects' $ withoutIntersect [(eff2, StackEffect [] [] [])]
---     checkEffects' $ withoutIntersect [(after', StackEffect [] [] [])]
---   s <- lift getState
---   let eff = map fst (s ^. _effects._Wrapped._1)
---   iop "Das sind die effekte:"
---   iop $ show eff
-
-
-
---   iop " eff1"
---   showEffs' [eff1]
---   iop $ "constraints eff1"
-
---   mapM (iop . show) (constraints eff1)
---   iop $ "constraints eff2"
---   mapM (iop . show) (constraints eff2)
---   return $ (all (`elem` constraints eff2) $ constraints eff1) &&  ((==0) . length . filter (not . (\eff -> eff ^. _before == [] && eff ^. _after == [])) $ eff)

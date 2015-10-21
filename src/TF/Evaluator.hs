@@ -54,14 +54,11 @@ evalForthWordWithout ws         = do
             
 -- | Determines the semantics of the word, according to the state and determines whether its gets compiled or executed. The word can change the state variable.
 evalKnownWord                                       :: Word -> CheckerM  (ForthWord, SemState)
-evalKnownWord w' = do 
+evalKnownWord w'@(Word _ nameW runtime execution compSem intSem _ intersect) = do 
   s <- getState
   let state'               = view _stateVar s
-  let intSem               = w'^._interpretation               :: InterpretationSemantics
-      compSem              = w'^._compilation                  :: CompilationSemantics
-      definedExeSem        = w' ^. _execution._Wrapped ^? _Sem :: Maybe Semantics
+  let definedExeSem        = w' ^. _execution._Wrapped ^? _Sem :: Maybe Semantics
       runtimeSem           = w' ^. _runtime._Wrapped ^? _Sem   :: Maybe Semantics
-      intersect = w' ^. _intersections
 
   sem <- if state' == INTERPRETSTATE then
               case intSem of
@@ -78,30 +75,28 @@ evalKnownWord w' = do
 
   modifyState (_stateVar .~ fromMaybe state' (sem >>= view _semEnter))
 
-  let reverseStacks' = reverseEffects 
+  let reverseStacks' = reverseArgs
                         
-      reverseStacks sem' = (`fmap` sem') reverseStacks'
+      -- _semToArgs = _semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse
+      -- reverseArgs = foldr (.) id (map (\l -> l %~ reverse) [_semToArgs._before, _semToArgs._after, _semToArgs._streamArgs])
+      reverseStacks sem' = (`fmap` sem') reverseArgs
                                            
-      reverseEffects  = over (_semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse._before) reverse .
-                             over (_semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse._after) reverse .
-                             over (_semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse._streamArgs) reverse
+      _semToArgs = _semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse
+      reverseArgs = over (_semToArgs._before) reverse .
+                    over (_semToArgs._after) reverse .
+                    over (_semToArgs._streamArgs) reverse
       singleSemantics ::   CompiledExecutedOrBoth MultiStackEffect
       singleSemantics = (view (_semEffectsOfStack._stefwiMultiEffects) . fromJust $ reverseStacks sem) &
                            if state' == COMPILESTATE && compSem == APPEND_EXECUTION then
                              One' 
                            else 
-                             maybe Two' (\runtime execSem -> Three' (view (_semEffectsOfStack._stefwiMultiEffects) . reverseEffects $ runtime, execSem)) runtimeSem
+                             maybe Two' (\runtime execSem -> Three' (view (_semEffectsOfStack._stefwiMultiEffects) . reverseArgs $ runtime, execSem)) runtimeSem
 
   let newIntersect = if | state' == COMPILESTATE && compSem == APPEND_EXECUTION -> intersect & _compileEffect .~ (intersect ^. _execEffect)
                         | isNothing runtimeSem -> intersect
                         | True -> intersect
 
-  let kw = ParsedWord (w' ^. _parsedW) (w' ^. _nameW) singleSemantics (view _semEnter (fromJust sem)) newIntersect 
-           -- & name .~ view name w'
-           -- & parsed .~ view parsed w'
-           -- & stacksEffects .~ singleSemantics
-           -- & _intersections .~ newIntersect
-           -- & enter .~ view _semEnter (fromJust sem)
+  let kw = ParsedWord (w' ^. _parsedW) nameW singleSemantics (view _semEnter (fromJust sem)) newIntersect 
 
   let args :: MaybeT (ParsecT [Token] ParseState StackEffectM) [DefiningOrNot]
       args = hoistMaybe $ preview (_stacksEffects._ExecutedEff._Wrapped._head._streamArgs) kw `mplus`
@@ -110,19 +105,14 @@ evalKnownWord w' = do
           rFS <- view readFromStream
           guard rFS
           args' <- args
-          resolvedArgs <- lift $ resolveStreamArgs args' []
+          resolvedArgs <- lift (resolveStreamArgs args' []) :: MaybeT (ParsecT [Token] ParseState StackEffectM) [DefiningOrNot]
           let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
-              -- return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse._after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
           return $ kw & _stacksEffects._ExecutedEff._Wrapped.traverse %~ ((_streamArgs .~ resolvedArgs) . (_before.traverse %~ resolveRuntimeType resolvedRuntimes) . (_after.traverse %~ resolveRuntimeType resolvedRuntimes))
 
   kw' <- runMaybeT resolveArgs
 
-  -- iop $ show kw'
-
-  
   s <- getState
   return (KnownWord (maybe kw id kw'), view _stateVar s)
-  -- return  kw
           
 
   
@@ -206,22 +196,14 @@ evalDefinedWord uk = do
      let state' = view _stateVar s
      cDef@(ColonDefinitionProcessed definition effects) <- hoistMaybe $ maybeColonDefinition uk s
 
-     -- when (isLeft definition') $
-     --     lift $ throwing _ErrorT (definition' ^?! _Left)
-
-     -- let (Right definition) = definition'
-
      lift $ when (isImmediateColonDefinition definition) $ do
                input <- getInput
                coreWords <- use _wordsMap
                let lookupW w = fromJust $ M.lookup (WordIdentifier (Te.pack w)) coreWords
-               -- let asdf :: Lens' (Either NameOfDefinition NameOfWord) (Either NameOfDefinition Word)
-               --     asdf = undefined
                let defOrWords' :: [Either NameOfDefinition NameOfWord]
-                   defOrWords' = toListOf (body.traverse._Expr._Postpone) definition 
+                   defOrWords' = definition ^.. body.traverse._Expr._Postpone
                    defOrWords :: [Either NameOfDefinition Word]
-                   -- defOrWords = map (either id (_df lookupW)) $ _defOrWords'
-                   defOrWords = over (traverse._Right) lookupW $ defOrWords'
+                   defOrWords = defOrWords' & traverse._Right %~ lookupW
                    postpones :: [Token]
                    postpones = defOrWords & map
                                (either (UnknownToken . Unknown)
@@ -238,16 +220,17 @@ evalUnknown uk =  do
   fmap fromJust . runMaybeT $ msum [evalDefinedWord uk, evalCreatedWord uk, return (evalNonDefinition uk, view _stateVar s)]
 
 handleHOTstreamArgument :: DefiningOrNot -> Token -> CheckerM DefiningOrNot
-handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) possWord = do 
-  (forthWord, _) <- sealed $ local (readFromStream .~ False) $ evalToken possWord
-  iop "handleHOT"
-  iop $ show forthWord
+handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) token = do 
+  (forthWord, _) <- sealed $ local (readFromStream .~ False) $ evalToken token
+  -- iop "handleHOT"
+  -- iop $ show forthWord
   case forthWord of
     UnknownE _ -> return arg
     DefE definition -> do
-      let effs = view (compOrExecIso.chosen._2) definition :: [StackEffect]
-      iop "EFF:"
-      mapM_ (iopP . render. P.stackEffect) effs
+      -- let effs = view (compOrExecIso.chosen._2) definition :: [StackEffect]
+      let effs = definition ^. compOrExecIso.chosen._2 :: [StackEffect]
+      -- iop "EFF:"
+      -- mapM_ (iopP . render. P.stackEffect) effs
       adjustHOT effs
     KnownWord pw -> do
       when (has (_stacksEffects._CompAndExecutedEff) pw) $
@@ -313,7 +296,7 @@ resolveStreamArgs (x:xs) acc =  do
 
     let x' :: DefiningOrNot
         x' = x & _Defining._definingArgInfo._resolved ?~ resolveArg
-               & _NotDefining._streamArgInfo._resolved ?~ resolveArg -- bimap (_definingArgInfo._resolved ?~ resolveArg) (_streamArgInfo._resolved ?~ resolveArg) x
+               & _NotDefining._streamArgInfo._resolved ?~ resolveArg 
 
     resolveStreamArgs xs (x':acc)
 

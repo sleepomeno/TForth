@@ -201,76 +201,43 @@ instance HasStackEffects Expr where
 -- TODO forced effects possible even if colonexprclash
   getStackEffects (ColonExpr colonName stackCommentEffects bodyWords) = do
 
-    iopC $ "in colonexpr getstackeffects"
-    iopC $ show stackCommentEffects
-
-    -- iopC $ "bodywords"
-
-    -- liftIO $ putStrLn . render . P.pprint $ bodyWords
-    -- iopC $ "before in colonexpr"
-    -- compExecEffects <- fromEmptyStack $ checkNodes bodyWords
-    let isForced = has (_Just._2.filtered id) stackCommentEffects
+    let isForced = has (_Just._2.only True) stackCommentEffects
     whenM (lift $ (isForced &&) <$> (not <$> view allowForcedEffects)) $ throwing _ForcedEffectsNotAllowed ()
 
     lift $ modifyState $ set _currentCompiling True
     checkNodes <- view _1
     (effs, compI) <- if isForced then do 
-             -- return ((stackCommentEffects & view (_Just._1._semEffectsOfStack._stefwiMultiEffects._Wrapped)), False)
               let forcedEffects = stackCommentEffects ^. _Just._1._semEffectsOfStack._stefwiMultiEffects._Wrapped
               let isIntersect = getAny $ stackCommentEffects ^. _Just._1._semEffectsOfStack._stefwiIntersection._Wrapped._Unwrapped
               return (forcedEffects, isIntersect)
             else (do
               (ForthEffect (compExecEffects, Intersections compI execI )) <- withEmpty' $ checkNodes bodyWords
 
-              let compColonEffects = (compExecEffects ^.. traverse._1)
-                  execColonEffects = (compExecEffects ^.. traverse._2)
+              let (compColonEffects, execColonEffects) = unzip compExecEffects
 
               forceBeforesEmpty execColonEffects colonName
               forceAftersEmpty execColonEffects colonName
 
-              -- effs <- liftM (view chosen) . runEitherT  $ do
               effs <- (`runContT` return) $ callCC $ \ret -> do
-                let stEffs' = view (_1._semEffectsOfStack._stefwiMultiEffects) <$> stackCommentEffects
-                when (isNothing stEffs') $ ret compColonEffects
+                let stEffs' = preview (_Just._1._semEffectsOfStack._stefwiMultiEffects) stackCommentEffects
+                case stEffs' of
+                  Nothing -> ret compColonEffects
+                  Just specifiedEffs -> do
+                    let compositions :: [StackEffectPair]
+                        compositions = liftM2 (,) compColonEffects (specifiedEffs ^. _Wrapped) 
 
-                let specifiedEffs = stEffs' ^?! _Just
+                    let validCombinations = filter ((== min (lengthOf _Wrapped specifiedEffs) (length compColonEffects)) . length . group . map snd) . sequence . groupBy ((==) `on` fst) $ compositions
+                        allOrAny = if compI then anyM else allM
+                    stackCommentIsOK <- anyM (allOrAny (\(inferred,specified) -> lift $ inferred `effectMatches` specified)) validCombinations
 
-                -- let validCombinations = filter ((const True) . length . group . map snd) . sequence . groupBy ((==) `on` fst) $ liftM2 (,) compColonEffects specifiedEffs 
-                let validCombinations = filter ((== min (lengthOf _Wrapped specifiedEffs) (length compColonEffects)) . length . group . map snd) . sequence . groupBy ((==) `on` fst) $ liftM2 (,) compColonEffects (specifiedEffs ^. _Wrapped)
-                -- let validCombinations' =  liftM2 (,) compColonEffects specifiedEffs 
-                -- let validCombinations'' = sequence $ groupBy ((==) `on` fst) $ liftM2 (,) compColonEffects specifiedEffs 
-                    allOrAny = if compI then anyM else allM
-                -- stackCommentIsOK <- allM (\x -> anyM (\y -> do
-                --   lift $ y `effectMatches` x) compColonEffects) specifiedEffs
-                stackCommentIsOK <- anyM (allOrAny (\(inferred,specified) -> lift $ inferred `effectMatches` specified)) validCombinations
-                -- iop $ "length validCombinations: " <> (show $ length validCombinations)
-                -- mapM (\[(a,b), (c,d)] -> iop "newtuple" >> showEff c >> showEff d) validCombinations''
-                -- stackCommentIsOK <- anyM (allM (\(inferred,specified) -> do
+                    if stackCommentIsOK then do
+                        return $ specifiedEffs ^. _Wrapped
+                    else  do
 
-                --      iop "inferred"
-                --      showEffs' [inferred]
-                --      iop "specified"
-                --      showEffs' [specified]
-                --      lift $ specified `effectMatches` inferred)) validCombinations
-                  -- lift $ y `effectIsSubtypeOf` x) compColonEffects) specifiedEffs
-
-                if stackCommentIsOK then do
-                    return $ specifiedEffs ^. _Wrapped
-                else  do
-
-                    -- iop $ "validCombinations"
-                    -- iop $ "compcolon EFFEKTE:"
-                   
-                    -- (mapM_ (iopC . render . P.stackEffect) $ compColonEffects )
-
-                    -- iop $ "> spezifizierte EFFEKTE:"
-                    -- mapM_ (iopC . render . P.stackEffect) specifiedEffs 
-                    -- lift . lift . lift $ E.left $ "Stack comment does not match in word " ++ colonName
-                    lift . lift $ throwing _NotMatchingStackComment colonName
+                        lift . lift $ throwing _NotMatchingStackComment colonName
               return (effs, compI))
 
     lift $ exportColonDefinition isForced colonName effs compI
-
     lift $ modifyState $ set _currentCompiling False
 
     return emptyForthEffect

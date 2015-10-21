@@ -120,14 +120,7 @@ data Word = Word {
               } deriving (Show, Eq)
 
 
--- newtype Intersection = Intersection Bool deriving (Show)
-
--- data StackEffectsWI = StackEffectsWI {
---     stefwiMultiEffects :: [StackEffect]
---   , stefwiIntersection :: Intersection } deriving (Show)
-                          
 data EffectsByPhase = Forced StackEffectsWI
-                    -- | Checked ([StackEffect],Bool)
                     | Checked StackEffectsWI -- ([StackEffect],Bool)
                     | NotChecked
                     | Failed String  deriving (Show)

@@ -23,8 +23,6 @@ isSubtypeOf t1 t2 = do
   if refDegree t1 == refDegree t2 then do
     let baseType1 = baseType t1  :: DataType
         baseType2 = baseType t2
-        -- bothNotWildcard = has _NoReference baseType1 && has _NoReference baseType2
-        -- subtypeOfWildcard = ((not (has _Wildcard baseType1) && has _Wildcard baseType2)) || ((not (has _WildcardWrapper baseType1) && has _WildcardWrapper baseType2)) || (has _Wildcard baseType1 && has _Wildcard baseType2) || (has _Dynamic baseType1 || has _Dynamic baseType2 || has (_NoReference._PrimType.symbol.only DYN) baseType1 || has (_NoReference._PrimType.symbol.only DYN) baseType2)
         subtypeOfWildcard = ((not (has _Wildcard baseType1) && has _Wildcard baseType2)) || ((not (has _WildcardWrapper baseType1) && has _WildcardWrapper baseType2)) || (has _Wildcard baseType1 && has _Wildcard baseType2) || (has _Dynamic baseType1 || has _Dynamic baseType2 || has (_NoReference._PrimType._primtypeSymbol.only DYN) baseType1 || has (_NoReference._PrimType._primtypeSymbol.only DYN) baseType2)
         subtypeOfXT :: Bool
         subtypeOfXT = fromMaybe False $ do
@@ -37,14 +35,6 @@ isSubtypeOf t1 t2 = do
           type1 <- baseType1 ^? _NoReference
           type2 <- baseType2 ^? _NoReference
           return $ S.member (type1, type2) subtypeRelationSet
-
-    -- iop "Type 1"
-    -- let t1' = P.dataType $ ((baseType1, Nothing) :: IndexedStackType)
-    -- iop $ render t1'
-    -- iop $ "has dynamic: " ++ show (has _Dynamic baseType1)
-    -- iop "Type 2"
-    -- let t2' = P.dataType $ ((t2, Nothing) :: IndexedStackType)
-    -- iop $ render t2'
 
     return $ subtypeOfXT || inSubtypeRelation || subtypeOfWildcard
   else return False 
