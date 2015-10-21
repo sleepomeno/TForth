@@ -33,7 +33,7 @@ parseNoName :: ExpressionsM Expr
 parseNoName = do
   parseKeyword ":noname"
   parseStackEffectSemantics <- view parseStackEffectSemantics'
-  sem <- lift $ (_Just._1 %~ (view (_semEffectsOfStack._Wrapped))) <$> (optionMaybe $ parseStackEffectSemantics parseEffect)
+  sem <- lift $ (_Just._1 %~ (view (_semEffectsOfStack._stefwiMultiEffects._Wrapped))) <$> (optionMaybe $ parseStackEffectSemantics parseEffect)
 
   let parseDefines = do
         clazz <- parseClassName
@@ -78,7 +78,7 @@ parseVariable = do
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   sem <- lift $ optionMaybe $ parseStackEffectSemantics parseFieldType
   -- iop $ show sem
-  return (field, sem & fmap fst & _Just %~ (fromJust . preview (_semEffectsOfStack._Wrapped._head)))
+  return (field, sem & fmap fst & _Just %~ (fromJust . preview (_semEffectsOfStack._stefwiMultiEffects._Wrapped._head)))
 
 parseMethod :: ExpressionsM (String, Maybe ([StackEffect], Bool))
 parseMethod = do
@@ -86,7 +86,7 @@ parseMethod = do
   method <- parseUnknownName
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   sem <- lift $ optionMaybe $ parseStackEffectSemantics parseEffect
-  return (method, sem & _Just._1 %~ view (_semEffectsOfStack._Wrapped))
+  return (method, sem & _Just._1 %~ view (_semEffectsOfStack._stefwiMultiEffects._Wrapped))
 
 parseEndClass :: ExpressionsM String
 parseEndClass = do

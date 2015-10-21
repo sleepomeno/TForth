@@ -120,11 +120,11 @@ data Word = Word {
               } deriving (Show, Eq)
 
 
-newtype Intersection = Intersection Bool deriving (Show)
+-- newtype Intersection = Intersection Bool deriving (Show)
 
-data StackEffectsWI = StackEffectsWI {
-    stefwiMultiEffects :: [StackEffect]
-  , stefwiIntersection :: Intersection } deriving (Show)
+-- data StackEffectsWI = StackEffectsWI {
+--     stefwiMultiEffects :: [StackEffect]
+--   , stefwiIntersection :: Intersection } deriving (Show)
                           
 data EffectsByPhase = Forced StackEffectsWI
                     -- | Checked ([StackEffect],Bool)
@@ -258,7 +258,6 @@ makeLenses ''BuildState
 makeLens ''ParseEffectResult
 makeFields ''ParseState
 makePrisms ''EffectsByPhase
-makeFields ''StackEffectsWI
 makeLens ''Word
 makeTraversals ''Optional
 makeTraversals ''CompilationSemantics
@@ -361,6 +360,12 @@ instance HasDefault Word where
 
 instance HasDefault Semantics where
   def = Semantics def def def
+
+instance HasDefault StackEffectsWI where
+  def = StackEffectsWI def def
+
+instance HasDefault Intersection where
+  def = Intersection False
 
 instance HasDefault MultiStackEffect where
   def = MultiStackEffect []

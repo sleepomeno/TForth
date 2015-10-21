@@ -127,7 +127,7 @@ parseCast = do
   (sem, _) <- lift $ parseStackEffectSemantics parseCast'
   iop "CAST"
   iop $ show sem
-  let effs = sem ^. _semEffectsOfStack._Wrapped
+  let effs = sem ^. _semEffectsOfStack._stefwiMultiEffects._Wrapped
   compOrExec <- compOrExec'
   return $ Cast (compOrExec effs)
 
@@ -141,7 +141,7 @@ parseAssertion = do
   (sem, forced) <- lift $ parseStackEffectSemantics parseAssertion'
   iop "ASSERTION"
   -- iop $ show sem
-  let effs = sem ^. _semEffectsOfStack._Wrapped
+  let effs = sem ^. _semEffectsOfStack._stefwiMultiEffects._Wrapped
   compOrExec <- compOrExec'
   return $ Assert (compOrExec effs) forced
   
@@ -151,6 +151,6 @@ parseRawAssertion = do
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   (sem, forced) <- lift $ parseStackEffectSemantics parseEffect
   -- iop $ "RAW_ASSERTION"
-  let effs = sem ^. _semEffectsOfStack._Wrapped
+  let effs = sem ^. _semEffectsOfStack._stefwiMultiEffects._Wrapped
   compOrExec <- compOrExec'
   return $ Assert (compOrExec effs) forced

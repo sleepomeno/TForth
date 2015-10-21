@@ -39,9 +39,15 @@ data SemState = INTERPRETSTATE | COMPILESTATE deriving (Show, Eq)
 data Semantics = Semantics {
                      semDescription :: String
                    , semEnter :: Maybe SemState
-                   , semEffectsOfStack:: MultiStackEffect
+                   , semEffectsOfStack:: StackEffectsWI
                       } deriving (Show, Eq)
              
+newtype Intersection = Intersection Bool deriving (Eq,Show)
+
+data StackEffectsWI = StackEffectsWI {
+    stefwiMultiEffects :: MultiStackEffect
+  , stefwiIntersection :: Intersection } deriving (Show,Eq)
+
 data Intersections = Intersections {
     compileEffect :: Bool
   , execEffect :: Bool
@@ -127,4 +133,6 @@ makeTraversals ''OOFieldSem'
 makeTraversals ''Parsable
 makeTraversals ''CompiledOrExecuted
 
+makeLens ''StackEffectsWI
+makeWrapped ''Intersection
 makeLens ''Intersections

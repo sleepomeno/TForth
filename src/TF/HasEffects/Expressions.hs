@@ -4,6 +4,7 @@ module TF.HasEffects.Expressions (getStackEffects) where
 
 import           Control.Error            as E
 import           Control.Lens             hiding (noneOf, (??), _Empty)
+import Data.Monoid (getAny)
 import           Control.Monad.Error.Lens
 import           Control.Monad.Extra
 import           Control.Monad.Reader
@@ -192,7 +193,7 @@ instance HasStackEffects Expr where
   getStackEffects (ColonExprClash n stackCommentEffects) = do
     let isForced = has (_Just._2.only True) stackCommentEffects
     when isForced $ do
-       let effs = (stackCommentEffects & view (_Just._1._semEffectsOfStack._Wrapped))
+       let effs = stackCommentEffects ^. _Just._1._semEffectsOfStack._stefwiMultiEffects._Wrapped
        lift $ exportColonDefinition isForced n effs False
     return emptyForthEffect
 
@@ -213,8 +214,11 @@ instance HasStackEffects Expr where
 
     lift $ modifyState $ set _currentCompiling True
     checkNodes <- view _1
-    (effs, compI) <- if isForced then
-             return ((stackCommentEffects & view (_Just._1._semEffectsOfStack._Wrapped)), False)
+    (effs, compI) <- if isForced then do 
+             -- return ((stackCommentEffects & view (_Just._1._semEffectsOfStack._stefwiMultiEffects._Wrapped)), False)
+              let forcedEffects = stackCommentEffects ^. _Just._1._semEffectsOfStack._stefwiMultiEffects._Wrapped
+              let isIntersect = getAny $ stackCommentEffects ^. _Just._1._semEffectsOfStack._stefwiIntersection._Wrapped._Unwrapped
+              return (forcedEffects, isIntersect)
             else (do
               (ForthEffect (compExecEffects, Intersections compI execI )) <- withEmpty' $ checkNodes bodyWords
 
@@ -226,13 +230,13 @@ instance HasStackEffects Expr where
 
               -- effs <- liftM (view chosen) . runEitherT  $ do
               effs <- (`runContT` return) $ callCC $ \ret -> do
-                let stEffs' = view (_1._semEffectsOfStack._Wrapped) <$> stackCommentEffects
+                let stEffs' = view (_1._semEffectsOfStack._stefwiMultiEffects) <$> stackCommentEffects
                 when (isNothing stEffs') $ ret compColonEffects
 
                 let specifiedEffs = stEffs' ^?! _Just
 
                 -- let validCombinations = filter ((const True) . length . group . map snd) . sequence . groupBy ((==) `on` fst) $ liftM2 (,) compColonEffects specifiedEffs 
-                let validCombinations = filter ((== min (length specifiedEffs) (length compColonEffects)) . length . group . map snd) . sequence . groupBy ((==) `on` fst) $ liftM2 (,) compColonEffects specifiedEffs 
+                let validCombinations = filter ((== min (lengthOf _Wrapped specifiedEffs) (length compColonEffects)) . length . group . map snd) . sequence . groupBy ((==) `on` fst) $ liftM2 (,) compColonEffects (specifiedEffs ^. _Wrapped)
                 -- let validCombinations' =  liftM2 (,) compColonEffects specifiedEffs 
                 -- let validCombinations'' = sequence $ groupBy ((==) `on` fst) $ liftM2 (,) compColonEffects specifiedEffs 
                     allOrAny = if compI then anyM else allM
@@ -251,16 +255,16 @@ instance HasStackEffects Expr where
                   -- lift $ y `effectIsSubtypeOf` x) compColonEffects) specifiedEffs
 
                 if stackCommentIsOK then do
-                    return specifiedEffs
+                    return $ specifiedEffs ^. _Wrapped
                 else  do
 
                     -- iop $ "validCombinations"
-                    iop $ "compcolon EFFEKTE:"
+                    -- iop $ "compcolon EFFEKTE:"
                    
-                    (mapM_ (iopC . render . P.stackEffect) $ compColonEffects )
+                    -- (mapM_ (iopC . render . P.stackEffect) $ compColonEffects )
 
-                    iop $ "> spezifizierte EFFEKTE:"
-                    mapM_ (iopC . render . P.stackEffect) specifiedEffs 
+                    -- iop $ "> spezifizierte EFFEKTE:"
+                    -- mapM_ (iopC . render . P.stackEffect) specifiedEffs 
                     -- lift . lift . lift $ E.left $ "Stack comment does not match in word " ++ colonName
                     lift . lift $ throwing _NotMatchingStackComment colonName
               return (effs, compI))

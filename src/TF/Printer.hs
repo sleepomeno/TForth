@@ -244,11 +244,13 @@ dataType (NoReference basicType, index) = case basicType of
   ExecutionType token -> text "ExecutionType" $+$ nested (ppDoc token) 
 
 
+multiStackEffect (MultiStackEffect effs) = vcat $ map stackEffect effs
+
 colonDefinition' :: ColonDefinitionProcessed -> Doc
 colonDefinition' (ColonDefinitionProcessed c effsByPhase) = (case effsByPhase of
-                                                  Checked (StackEffectsWI effs (Intersection intersect)) -> (text ("Stack effect inferred: (" <> (if intersect then "" else "NOT ") <> " INTERSECT)")) $+$ (nested . vcat . map stackEffect $ effs)
+                                                  Checked (StackEffectsWI effs (Intersection intersect)) -> (text ("Stack effect inferred: (" <> (if intersect then "" else "NOT ") <> " INTERSECT)")) $+$ (nested . multiStackEffect $ effs)
                                                   NotChecked -> text "Stack effect not Checked"
-                                                  Forced (StackEffectsWI effs _) -> text "Stack effect forced" $+$ (nested . vcat . map stackEffectNice $ effs)
+                                                  Forced (StackEffectsWI effs _) -> text "Stack effect forced" $+$ (nested . multiStackEffect $ effs)
                                                   Failed s -> text ("FAILURE: " ++ s))
 
 colonDefinition'' :: ColonDefinition -> Doc

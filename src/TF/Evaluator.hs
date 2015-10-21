@@ -63,8 +63,6 @@ evalKnownWord w' = do
       runtimeSem           = w' ^. _runtime._Wrapped ^? _Sem   :: Maybe Semantics
       intersect = w' ^. _intersections
 
-  -- when (intersect ^. execEffect) $ undefined
-
   sem <- if state' == INTERPRETSTATE then
               case intSem of
                 ADOPT_EXECUTION        -> return definedExeSem
@@ -80,19 +78,19 @@ evalKnownWord w' = do
 
   modifyState (_stateVar .~ fromMaybe state' (sem >>= view _semEnter))
 
-  let reverseStacks' = reverseEffects _Wrapped
+  let reverseStacks' = reverseEffects 
                         
       reverseStacks sem' = (`fmap` sem') reverseStacks'
                                            
-      reverseEffects stack = over (_semEffectsOfStack.stack.traverse._before) reverse .
-                             over (_semEffectsOfStack.stack.traverse._after) reverse .
-                             over (_semEffectsOfStack.stack.traverse._streamArgs) reverse
+      reverseEffects  = over (_semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse._before) reverse .
+                             over (_semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse._after) reverse .
+                             over (_semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse._streamArgs) reverse
       singleSemantics ::   CompiledExecutedOrBoth MultiStackEffect
-      singleSemantics = (view _semEffectsOfStack . fromJust $ reverseStacks sem) &
+      singleSemantics = (view (_semEffectsOfStack._stefwiMultiEffects) . fromJust $ reverseStacks sem) &
                            if state' == COMPILESTATE && compSem == APPEND_EXECUTION then
                              One' 
                            else 
-                             maybe Two' (\runtime execSem -> Three' (view _semEffectsOfStack . reverseStacks' $ runtime, execSem)) runtimeSem
+                             maybe Two' (\runtime execSem -> Three' (view (_semEffectsOfStack._stefwiMultiEffects) . reverseEffects $ runtime, execSem)) runtimeSem
 
   let newIntersect = if | state' == COMPILESTATE && compSem == APPEND_EXECUTION -> intersect & _compileEffect .~ (intersect ^. _execEffect)
                         | isNothing runtimeSem -> intersect
@@ -152,7 +150,7 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
     cause <- hoistEither $ matching _Failed effs'
     lift $ throwing _ClashInWord $ "ERROR in '" <> colonName <> "': " <> cause
 
-  let effs = [emptySt] `fromMaybe` ((effs' ^? _Checked.multiEffects) `mplus` (effs' ^? _Forced.multiEffects))
+  let effs = [emptySt] `fromMaybe` ((effs' ^? _Checked._stefwiMultiEffects._Wrapped) `mplus` (effs' ^? _Forced._stefwiMultiEffects._Wrapped))
 
   stEff <- liftUp $ tryHead (_Impossible # (colonName ++ " has no effects! Empty List!")) effs
 

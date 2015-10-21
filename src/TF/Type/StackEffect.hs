@@ -5,6 +5,7 @@ module TF.Type.StackEffect where
 import TF.ForthTypes
 import TF.TH
 import Lens.Simple 
+import Control.Lens (makeWrapped)
 
 -- type DefiningOrNot = Either DefiningArg StreamArg
 data DefiningOrNot = Defining DefiningArg | NotDefining StreamArg deriving (Show,Eq,Ord)

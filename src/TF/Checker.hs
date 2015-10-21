@@ -74,14 +74,14 @@ resolveUnknownType :: Identifier -> DataType -> CheckerM ()
 resolveUnknownType identifier arg = blocked $ do
   iopW "RESOLVE UNKNOWN TYPES OF"
   targets1 <- toListOf (_definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isUnknownType) <$> getState 
-  targets2 <- toListOf (_definedWords'.traverse._ColDef.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining._argType._Just) <$> getState 
-  targets3 <- toListOf (_definedWords'.traverse._ColDef.processedEffects._Checked.multiEffects.traverse._after.traverse.filtered isUnknownType) <$> getState 
+  targets2 <- toListOf (_definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._streamArgs.traverse._Defining._argType._Just) <$> getState 
+  targets3 <- toListOf (_definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._after.traverse.filtered isUnknownType) <$> getState 
   iopW . render . vcat . map P.dataType $ targets1 ++ targets2 ++ targets3
   iopW $ "REPLACE WITH: " ++ (render . P.dataType $ (arg, 0))
 
   modifyState $ _definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isUnknownType._1 %~ setBaseType arg
-  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked.multiEffects.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over _Just (first $ setBaseType arg)
-  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked.multiEffects.traverse._before.traverse.filtered isUnknownType._1 %~ setBaseType arg
+  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over _Just (first $ setBaseType arg)
+  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._before.traverse.filtered isUnknownType._1 %~ setBaseType arg
   modifyState $ _classFields %~ imap (updateFields updateStackEffect)
   where
     isUnknownType = isCorrectCreatedWord identifier

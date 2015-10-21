@@ -80,7 +80,7 @@ addInfo (EFFECT e c) = do
                   else
                     effects'
   effects''' <- addTypeIndices effects''
-  setSemantics' (_Sem._semEffectsOfStack._Wrapped) effects'''
+  setSemantics' (_Sem._semEffectsOfStack._stefwiMultiEffects._Wrapped) effects'''
   c
 
 addInfo (END) = return ()

@@ -125,8 +125,8 @@ type UnresolvedArgsM = StateT (M.Map Int UniqueArg) CheckerM
   
 prepareUnresolvedArgsTypes :: (Semantics, Bool) -> CheckerM (Semantics, Bool)
 prepareUnresolvedArgsTypes (sem, forced) = do
-  effs <- (`evalStateT` M.empty) $ forM (sem ^. (_semEffectsOfStack._Wrapped)) go
-  return (sem & _semEffectsOfStack._Wrapped .~ effs, forced)
+  effs <- (`evalStateT` M.empty) $ forM (sem ^. (_semEffectsOfStack._stefwiMultiEffects._Wrapped)) go
+  return (sem & _semEffectsOfStack._stefwiMultiEffects._Wrapped .~ effs, forced)
   where
 
     go :: StackEffect -> UnresolvedArgsM StackEffect
@@ -176,5 +176,5 @@ parseStackEffectSemantics p = do
 
                               effects' =  parsedEffects  & traverse %~ (\(b,a) -> StackEffect (reverse b) streamArgs (reverse a))
                      in
-                       (def :: Semantics) & _semEffectsOfStack._Wrapped .~ effects'  & (, forcedEffect)
+                       (def :: Semantics) & _semEffectsOfStack._stefwiMultiEffects._Wrapped .~ effects'  & (, forcedEffect)
 

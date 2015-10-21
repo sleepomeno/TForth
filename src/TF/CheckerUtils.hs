@@ -76,9 +76,9 @@ compEff s = (s, emptySt)
 
 exportColonDefinition isForced colonName effs' compI = do 
     let modifier x = if isForced then
-                       Forced $ StackEffectsWI x (Intersection False)
+                       Forced $ StackEffectsWI (MultiStackEffect x) (Intersection False)
                      else
-                       Checked $ StackEffectsWI x (Intersection compI) 
+                       Checked $ StackEffectsWI (MultiStackEffect x) (Intersection compI) 
     forbidMulti <- views allowMultipleEffects not
     let effs = nub effs'
     checkResult <- if (length effs > 1 && forbidMulti) then do
