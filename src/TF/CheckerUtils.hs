@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction  #-}
+{-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts  #-}
 
 module TF.CheckerUtils where
 

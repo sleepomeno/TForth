@@ -9,6 +9,7 @@ import           Control.Monad.Writer
 import  Text.PrettyPrint (render,vcat, text, ($+$), nest)
 
 import           Control.Monad.RWS
+import           Control.Monad.Cont
 import           TF.Parsers.Parser
 import           TF.Parsers.Tokenizer
 import           TF.Util
@@ -23,6 +24,8 @@ import qualified Data.Set as S
 
 import System.IO
 import System.FilePath
+import System.Directory
+
 
 import TF.Type.StackEffect
 import TF.Type.Nodes
@@ -33,7 +36,21 @@ import Data.Tree.Zipper hiding (first,before,after)
 import Data.Tree
 
 checkFile :: ParseConfig -> FilePath -> IO ()
-checkFile conf file = do
+checkFile conf file = (`runContT` return) $ callCC $ \ret -> do
+    fileExists <- liftIO $ doesFileExist file
+    unless fileExists $ do
+      liftIO $ putStrLn $ file <> " does not exist!"
+      ret ()
+    handle <- liftIO $ openFile file ReadMode
+    contents <- liftIO $ hGetContents handle
+
+    liftIO $ runChecker conf contents
+
+    liftIO $ hClose handle  
+    return ()
+
+checkStaticFile :: ParseConfig -> FilePath -> IO ()
+checkStaticFile conf file = do
   dir <- getStaticDir
   let filePath =  dir </> file
 

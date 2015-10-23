@@ -95,14 +95,14 @@ isKnownWord              = do
         iopP $ unknownName
 
         runMaybeT $ do
-        y <- hoistMaybe $ maybeColonDefinition' uk
-        let immediate = y ^. colonDefinition.meta.isImmediate
-        if immediate then do
-            forthWord <- lift $ evalColonDefinition  (y & colonDefinition.meta.isImmediate .~ False)
-            return $ Left forthWord
-        else 
-    -- _Def
-            return $ Right . DefinitionName $ y ^. colonDefinition.meta.name
+            y <- hoistMaybe $ maybeColonDefinition' uk
+            let immediate = y ^. colonDefinition.meta.isImmediate
+            if immediate then do
+                forthWord <- lift $ evalColonDefinition  (y & colonDefinition.meta.isImmediate .~ False)
+                return $ Left forthWord
+            else 
+        -- _Def
+                return $ Right . DefinitionName $ y ^. colonDefinition.meta.name
 
     WordToken word -> do
       if word ^. _isImmediateWord then do 
