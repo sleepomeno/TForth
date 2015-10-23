@@ -23,6 +23,12 @@ import TF.Type.StackEffect
 import TF.Type.Nodes
 
 
+_forcedOrChecked :: Traversal' EffectsByPhase ( StackEffectsWI)
+_forcedOrChecked f (Forced x) = Forced <$> f x
+_forcedOrChecked f (Checked x) = Checked <$> f x
+_forcedOrChecked f (Failed x) = pure $ Failed x
+_forcedOrChecked f NotChecked = pure $ NotChecked
+
 nodeIso = iso (\case { ForthWord x -> Left x ; Expr x -> Right x }) (\case { Left x -> ForthWord x; Right x -> Expr x }) 
 argIso = iso (\case { DataArg x -> Left x ; NonDataArg x -> Right x }) (\case { Left x -> DataArg x; Right x -> NonDataArg x }) 
 tokenIso = iso (\case { UnknownToken x -> Left x ; WordToken x -> Right x }) (\case { Left x -> UnknownToken x; Right x -> WordToken x }) 

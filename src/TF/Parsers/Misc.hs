@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RankNTypes, FlexibleContexts, OverloadedStrings  #-}
 
 module TF.Parsers.Misc where
 
@@ -10,6 +10,7 @@ import           Control.Monad.Error.Lens
 import qualified Data.Map as M
 import           TF.Types hiding (state, isSubtypeOf)
 import  TF.Util
+import Data.Monoid
 import           Text.Parsec hiding (runParser, anyToken)
 import TF.Errors
 
@@ -109,6 +110,8 @@ parseColon = do
 
         -- inp <- getInput
         -- mapM_ iopS inp
+        iop "blobb"
+        iop reason
 
         allowLocalFailure' <- lift $ view allowLocalFailure
         unless allowLocalFailure' $ throwing _Clash reason

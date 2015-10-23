@@ -61,22 +61,12 @@ data ArgInfo a = ArgInfo {
 
                         
 data DefiningArg = DefiningArg {
-                    --   name :: String
-                    -- , resolved :: Maybe String
                       definingArgInfo :: ArgInfo StackEffect
                     , argType :: Maybe IndexedStackType
-                    -- , endDelimiter :: Maybe String
-
                     , runtimeEffect :: Maybe [(StackEffect,StackEffect)]
-                      -- the effect specification in comments:
-                    -- , runtimeSpecified :: Maybe StackEffect 
                     }  deriving (Show,Eq,Ord)
 
 data StreamArg = StreamArg {
-                     --   name :: String
-                     -- , resolved :: Maybe String
-                     -- , endDelimiter :: Maybe String
-                     -- , runtimeSpecified :: Maybe RuntimeSpecification
                       streamArgInfo :: ArgInfo RuntimeSpecification
                         
                     } deriving (Show,Eq,Ord)

@@ -11,6 +11,7 @@ import Prelude hiding (Word, last)
 
 import Control.Lens hiding (noneOf,(??), children)
 
+import Data.Monoid (getAny)
 import Data.Text.Lens 
 import Lens.Family.Total hiding ((&))
 import           Control.Monad.Cont
@@ -125,9 +126,11 @@ evalNonDefinition  =  UnknownE . Unknown . view _Wrapped
 evalColonDefinition :: ColonDefinitionProcessed -> CheckerM ForthWord
 evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
   s <- getState
+  
   let (ColonDefinition _ (ColonDefinitionMeta colonName isCdefImmediate)) = colonDef
   let st = view _stateVar s
       executed = st == INTERPRETSTATE || isCdefImmediate
+      
       -- executed = st == INTERPRETSTATE || colonDef ^. meta.isImmediate
       -- colonName = colonDef ^. name
 
@@ -144,16 +147,17 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
 
   stEff <- liftUp $ tryHead (_Impossible # (colonName ++ " has no effects! Empty List!")) effs
 
+  let intersect = getAny $ effs' ^. (_forcedOrChecked._stefwiIntersection._Wrapped._Unwrapped)
+  -- intersect <- liftUp $ maybeIntersect ?? (_ClashInWord # colonName)
+  -- intersect <- liftUp $ maybeIntersect ?? (_ClashInWord # colonName)
+
   let args = stEff ^. _streamArgs
       compiledOrExecuted = if executed  then
                              Executed
                            else
                              Compiled
 
-  iopP $ "EXECUTED:"
-  iopP $ show executed
-
-  effs' <- if executed then do
+  newEffects <- if executed then do
               resolvedArgs <- resolveStreamArgs args []
               let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
               -- return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse.filtered (\(t, _) -> has (_NoReference._ExecutionType.runtimeSpecified._Just._UnknownR) (baseType' t))) %~ (resolveRuntimeType resolvedRuntimes)
@@ -161,14 +165,10 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
 
            else
               return effs
-  iopP $ "AFTER resolving"
-  mapM_ (iopP . show) $ effs'
-
-  -- logD $ "resolved args: \n" ++ (show effs')
 
 
 
-  return $ DefE . compiledOrExecuted . (, effs') $ colonName
+  return $ DefE . compiledOrExecuted . (, (StackEffectsWI (MultiStackEffect newEffects) (Intersection intersect))) $ colonName
 
 evalCreatedWord :: Unknown -> MaybeT CheckerM (ForthWord, SemState)
 evalCreatedWord (Unknown ukName) = do
@@ -186,7 +186,7 @@ evalCreatedWord (Unknown ukName) = do
                            else
                              Compiled
 
-  return (DefE . compiledOrExecuted . (, effs) $ ukName, st)
+  return (DefE . compiledOrExecuted . (, StackEffectsWI (MultiStackEffect effs) def) $ ukName, st)
 
   
 evalDefinedWord :: Unknown -> MaybeT CheckerM (ForthWord, SemState)
@@ -228,7 +228,7 @@ handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (Unknow
     UnknownE _ -> return arg
     DefE definition -> do
       -- let effs = view (compOrExecIso.chosen._2) definition :: [StackEffect]
-      let effs = definition ^. compOrExecIso.chosen._2 :: [StackEffect]
+      let effs = definition ^. compOrExecIso.chosen._2._stefwiMultiEffects._Wrapped :: [StackEffect]
       -- iop "EFF:"
       -- mapM_ (iopP . render. P.stackEffect) effs
       adjustHOT effs

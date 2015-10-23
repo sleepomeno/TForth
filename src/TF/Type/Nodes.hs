@@ -62,7 +62,7 @@ data ParsedWord = ParsedWord {
                   } deriving (Show, Eq)
 
 data ForthWord = UnknownE Unknown
-               | DefE (CompiledOrExecuted (NameOfDefinition, [StackEffect]))
+               | DefE (CompiledOrExecuted (NameOfDefinition, StackEffectsWI))
                | KnownWord ParsedWord
                deriving (Eq, Show)
 

@@ -35,7 +35,6 @@ applyRule1 (stE1,stE2) = do
   -- iop $ "stE2"
   -- iop $ render . P.stackEffect $ stE2
 
-  iop "Rule 1 will be applied"
   -- Rule 1 is applicable if @after@ of state is empty
   let beforeTypes2 = stE2 ^. _before 
       toTypes2 = stE2 ^. _after 
@@ -59,7 +58,6 @@ applyRule2 (stE1,stE2) = do
     void typeClash
 
   assert $ null before2
-  iop "Rule 2 will be applied"
   -- Rule 2 is applicable if @before@ of the word is empty
   return $ stE1 &~ _after %= (after2 ++) &~ _streamArgs %= (++ view _streamArgs stE2) & _streamArgs %~ resolveArgs
 
@@ -73,9 +71,6 @@ applyRule3 (stE1, stE2) = do
     (topOfArgs,_)  <- hoistMaybe $ preview (_before.traverse) stE2
     typesMatch <- lift $ lift $ lift $ topOfStack `isSubtypeOf` topOfArgs
     assert (not typesMatch)
-    iop  "Rule 3 will beapplied"
-    iop $ "Top of stack: " ++ (show topOfStack)
-    iop $ "Top of args: " ++ (show topOfArgs)
     -- Rule 3 is applicable if the top of stack of both effects match
     typeClash
 
@@ -93,9 +88,6 @@ applyRule4 stE1 stE2 = chosen' $ applyRule4' stE1 stE2
         -- dataType <- hoistEither . note (stE1, stE2) $ dataType'
         hoistEither $ (if dataType' then Right else Left) (stE1, stE2)
         -- Types match exactly
-        iop $ "Rule 4 will beapplied since they are in a subtype relation:"
-        iop $ render $ P.dataType tS
-        iop $ render $ P.dataType tA
 
         hoistEither $ Left (stE1 & _after %~ tail, stE2 & _before %~ tail)
 

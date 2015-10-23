@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, NoMonomorphismRestriction  #-}
+{-# LANGUAGE RankNTypes, OverloadedStrings, FlexibleContexts, NoMonomorphismRestriction  #-}
 
 module TF.Parsers.ParserUtils where
 
@@ -7,6 +7,7 @@ import Prelude hiding (Word, last)
 import Control.Lens hiding (noneOf,(??), children)
 import           Control.Error as E
 import Data.Maybe (fromJust)
+import Data.Data
 import qualified TF.Printer as P
 import Data.Monoid
 import Control.Monad.Except
@@ -105,10 +106,31 @@ errorHandler handlingFunction colonName = [
                      handler (_TypeClashM._IfElseExprNotStatic) (handlingFunction . ((colonName <> ": If-Else branches do not have the same type\n") ++) . uncurry (++)),
                      handler_ (_TypeClashM._IfExprNotStatic) (handlingFunction (colonName <> ": An if branch which has an unempty stack effect is not allowed when multiple effects are forbidden")),
                      handler_ _MultiEffs (handlingFunction colonName),
+                     handler_ _UnemptyStack (throwing _UnemptyStack ("df","asdf")),
                      handler_ _MultiEffClash (handlingFunction "asdf"),
                      handler_ _CastsNotAllowed (handlingFunction (colonName <> ": Casts are not allowed")),
                      handler _Clash handlingFunction,
                      handler _UnknownWord handlingFunction
+                    ]
+
+-- handler' :: (Typeable a, Handleable e m h) => Getting (First a) e a -> ((Getting (First a) e a ) -> a -> m r) -> h r                   
+handler' l f = handler l (\x -> f l x)
+-- handler_' :: (Typeable a, Handleable e m h) => Getting (First a) e a -> ((Getting (First a) e a ) -> m r) -> h r                   
+handler_' l f = handler_ l (f l)
+
+-- errorHandler' :: (forall a r. (Getting (First a) e a ) -> a -> m r) -> String -> [Handler e m a ]
+errorHandler' :: (AsTypeClash e, AsError' e, AsFeatureErr e, AsMultiEffClash e) => (forall a. Getting (First a) e a -> String -> m r) -> String -> [Handler e m r]
+-- errorHandler' :: (AsTypeClash e, AsError' e, AsFeatureErr e, AsMultiEffClash e) => (AReview Error' String -> String -> m r) -> String -> [Handler e m r]
+errorHandler' handlingFunction colonName = [
+                       handler' _ClashInWord handlingFunction
+                     , handler' _BeginUntilNoFlag (\l s -> flip handlingFunction ("The body of begin until must produce a flag value!\n" ++ s) l)
+                     , handler' (_TypeClashM._IfElseExprNotStatic) (\l (s1,s2) -> flip handlingFunction (colonName <> ": If-Else branches do not have the same type\n" <> (s1  <> s2)) l)
+                     , handler_' (_TypeClashM._IfExprNotStatic) (flip handlingFunction (colonName <> ": An if branch which has an unempty stack effect is not allowed when multiple effects are forbidden"))
+                     , handler_' _MultiEffs (flip handlingFunction colonName)
+                     , handler_' _MultiEffClash (flip handlingFunction "asdf")
+                     , handler_' _CastsNotAllowed (flip handlingFunction (colonName <> ": Casts are not allowed"))
+                     , handler' _Clash handlingFunction
+                     , handler' _UnknownWord handlingFunction
                     ]
 
 parseUnknownToken'  = do 

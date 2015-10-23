@@ -140,13 +140,7 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
   effs <- lift $ applyWildcardRenaming' effs'
 
   let reduce effs = do
-        -- iopC "effsWithoutTopWildcardBefore"
-        -- liftIO . mapM (putStrLn . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e) . fst) $ effs
-        -- showEffs effs
         effsWithoutTopWildcard <- removeWildcards effs
-        -- iopC "after removeWildcards"
-        -- iopC "effsWithoutTopWildcardAfter"
-        -- liftIO . mapM (putStrLn . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e) . fst) $ effsWithoutTopWildcard
         reducedEffects <- mapM (\(comp,exec) -> do
                                    comp' <- uncurry applyRule4 comp
                                    exec' <- uncurry applyRule4 exec
@@ -161,8 +155,7 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
   reducedEffects <- lift (reduce effs) :: ReaderT CheckEffectsConfig CheckerM [(StackEffects, StackEffects)]
   -- iopC "after deduce"
 
-  -- exportWords $ reducedEffects ^.. (traverse.both._2)
-  reducedEffects' <- lift (exportWords' reducedEffects)  -- ^.. (traverse.both._2)
+  reducedEffects' <- lift (exportWords' reducedEffects)  
 
   let resultingEffects' :: [StackRuleM (StackEffect, StackEffect)]
       resultingEffects' = map (\(comp, exec) -> do
@@ -210,21 +203,18 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
     iop $ "newExecI: " <> show newExecI
     message <- errorInfo
     iop $ "message: " <> show message
-    throwing (_TypeClashM._MultiEffs) message
+    -- throwing (_TypeClashM._MultiEffs) message
+    throwing _Clash message
 
   validEffects <- fmap (toListOf (traverse._Right) . filter isRight) . mapM runExceptT $ resultingEffects'
 
   let typeChecks = (not . null $ validEffects)
 
-  -- iopC $ "Apply rules for " ++ (render $ (either P.forthWord P.expr) a)
-
-  -- lift $ guard typeChecks
 
   unless typeChecks $ do
     message <- errorInfo
     throwing _Clash message
 
-  -- lift $ modifyState $ set effects validEffects
   lift $ modifyState $ _effects._Wrapped._1 .~ validEffects
 
   updateIntersectionType nrOfOldCompEffs nrOfNewCompEffs _compileEffect oldCompileI newCompileI

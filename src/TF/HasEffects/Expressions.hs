@@ -112,7 +112,7 @@ instance HasStackEffects Expr where
 
     where
        l = if has (_ForthWord._DefE) create then
-             _DefE.chosen'._2
+             _DefE.chosen'._2._stefwiMultiEffects._Wrapped
            else
              _KnownWord._stacksEffects.chosen''._Wrapped
 

@@ -5,8 +5,6 @@
 
 module TF.Main where
 
--- import Present hiding (Char)
--- import Control.Lens (filtered,has,(^?!),only,(<<+=),imap,_Wrapped,element,preview,_head,_tail)
 -- import           Lens.Simple
 import Control.Lens
 import           TF.CallChecker               (runChecker')
@@ -27,17 +25,6 @@ _ParseState = _1._2
 _Success = _Right
 _Failure = _Left
 
--- defChecker = ParseConfig {}
---     & allowMultipleEffects         .~ False
---     & allowLocalFailure            .~ False
---     & allCoreDynamic               .~ False
---     & allowDynamicInStackComments  .~ False
---     & allowCasts                   .~ False
---     & allowForcedEffects           .~ False
---     & subtypes                     .~ (const [])
---     & allowOOP                     .~ False
---     & thirdParty                   .~ []
-  
 checker1 = ParseConfig {}
     & typeCheck                    .~ True
     & topLevelEmpty                .~ True
@@ -484,6 +471,8 @@ create = do
 
           knownType1 `shouldBe` knownType2
 
+defTestConfig' = defTestConfig & allowLocalFailure .~ True
+  
 assertions = do
   let check = fst . runChecker' (defTestConfig & allowLocalFailure .~ True)
 
@@ -586,6 +575,7 @@ main = hspec $
     it "type checking fails when an immediate word leaves something on the stack at compile time" $ do
        let program = ": foo + ; immediate : bar [ 3 2 ] foo ;"
        check program `shouldHave` (_Failure._UnemptyStack)
+       -- liefert type clash in checker 214, sollte obrigen fehler liefern
     it "type checking fails when an immediate word demands that there must be something on the stack at compile time" $ do
        let program = ": foo + ; immediate : bar foo ;"
        check program `shouldHave` (_Failure._UnemptyStack)

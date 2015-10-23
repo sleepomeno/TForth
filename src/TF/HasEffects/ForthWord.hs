@@ -21,17 +21,22 @@ instance HasStackEffects ForthWord where
 
 
   getStackEffects (DefE x) = do
-    -- let nameOfDef = view (compOrExecIso.chosen._1) x
-    let stEffs :: CompiledOrExecuted [StackEffect]
-        -- stEffs = bimap (view _2) (view _2)  x
-        stEffs = fmap snd x
-        effs :: [StackEffectPair]
-        effs = effsAsTuples stEffs
+    -- let stEffs :: CompiledOrExecuted [StackEffect]
+    --     stEffs = view (_2._stefwiMultiEffects._Wrapped) <$> x
+    --     intersect = view (_2._stefwiIntersection) <$> x
+    --     effs :: [StackEffectPair]
+    --     effs = effsAsTuples stEffs
+    let stEffsComp = x ^.. _Compiled._2._stefwiMultiEffects._Wrapped.traverse
+        stEffsExec :: [StackEffect]
+        stEffsExec = x ^.. _Executed._2._stefwiMultiEffects._Wrapped.traverse
+        count = max (length stEffsComp) (length stEffsExec) :: Int
+        padWithEmpty effs = take count (effs ++ repeat emptySt)
+        effects = zip (padWithEmpty stEffsComp) (padWithEmpty stEffsExec)
+        intersectComp = getAny $ x ^. _Compiled._2._stefwiIntersection._Wrapped._Unwrapped
+        intersectExec = getAny $ x ^. _Executed._2._stefwiIntersection._Wrapped._Unwrapped
+    return $ withIntersect (Intersections intersectComp intersectExec) effects
 
-    -- when ((x ^. chosen._1) /= "foo") $ do
-    --   iopP "FUUUUUUU"
-    --   liftIO (mapM_ (putStrLn . render . (P.stackEffect) . fst) $ effs )
-    return $ withoutIntersect effs
+    -- return $ withIntersect intersect effs
 
   getStackEffects (UnknownE uk) = do
     let unknownName = uk ^. _Wrapped

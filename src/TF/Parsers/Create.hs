@@ -38,9 +38,9 @@ parseCreating = do
          -- iopP $ render . P.forthWord $ forthWord
          unless (has _DefE forthWord) $ fail "not a defE"
 
-         let (_, effs) = forthWord ^?! (_DefE.compOrExecIso.chosen)
+         let (_, (StackEffectsWI effs _)) = forthWord ^?! (_DefE.compOrExecIso.chosen)
          let defArg :: Maybe DefiningArg
-             defArg = preview (_head._streamArgs.traverse._Defining) effs
+             defArg = preview (_Wrapped._head._streamArgs.traverse._Defining) effs
 
          when (isNothing defArg) $ fail "no defining args"
          -- iopP $ "after eval"
