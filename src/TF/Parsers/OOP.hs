@@ -153,10 +153,9 @@ parseClass = do
   -- inp <- getInput
   -- liftIO $ mapM_ (putStrLn . show) $ inp
   className <- parseEndClass
-  -- let classType = (NoReference $ _ClassType # className, Just uniqueIdentifier')
-  let classType = (NoReference $ ClassType className, Just uniqueIdentifier')
+  let classType = IndexedStackType (NoReference $ ClassType className) (Just uniqueIdentifier')
 
-  let variables = map (second $ maybe (InferredByField $ StackEffect [classType] [] [(UnknownType uniqueIdentifier, Just uniqueIdentifier'')])
+  let variables = map (second $ maybe (InferredByField $ StackEffect [classType] [] [IndexedStackType (UnknownType uniqueIdentifier) (Just uniqueIdentifier'')])
                        (ByFieldDefinition . over _before (classType:))) $ variables'
   let methods :: [(Method, OOMethodSem)]
       methods = map (second $ maybe Empty (ByDefinition . over (_1.traverse._before) (classType:))) $ methods' 

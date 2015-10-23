@@ -113,7 +113,7 @@ labeled = flip label
 
 
 resolveRuntimeType :: [(UniqueArg, StackEffect)] -> IndexedStackType -> IndexedStackType
-resolveRuntimeType resolvedRuntimes (t, i') = (setBaseType newType t, i')
+resolveRuntimeType resolvedRuntimes (IndexedStackType t i') = IndexedStackType (setBaseType newType t) i'
   where
     newType = case baseType t of
       NoReference t' -> NoReference $ (case t' of

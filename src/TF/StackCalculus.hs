@@ -67,8 +67,8 @@ applyRule3 (stE1, stE2) = do
     -- iop $ "will 3 be applied?"
     
     
-    (topOfStack,_) <- hoistMaybe $ preview (_after.traverse) stE1
-    (topOfArgs,_)  <- hoistMaybe $ preview (_before.traverse) stE2
+    IndexedStackType topOfStack _ <- hoistMaybe $ preview (_after.traverse) stE1
+    IndexedStackType topOfArgs _  <- hoistMaybe $ preview (_before.traverse) stE2
     typesMatch <- lift $ lift $ lift $ topOfStack `isSubtypeOf` topOfArgs
     assert (not typesMatch)
     -- Rule 3 is applicable if the top of stack of both effects match
@@ -82,10 +82,9 @@ applyRule4 stE1 stE2 = chosen' $ applyRule4' stE1 stE2
      applyRule4' stE1 stE2 = do
         -- iop $ "will 4 be applied?"
 
-        tS@(topOfStack,_) <- firstOf (_after.traverse) stE1 ?? (stE1, stE2)
-        tA@(topOfArgs,_)  <- firstOf (_before.traverse) stE2 ?? (stE1, stE2)
+        tS@(IndexedStackType topOfStack _) <- firstOf (_after.traverse) stE1 ?? (stE1, stE2)
+        tA@(IndexedStackType topOfArgs _)  <- firstOf (_before.traverse) stE2 ?? (stE1, stE2)
         dataType' <- lift $ topOfStack `isSubtypeOf` topOfArgs
-        -- dataType <- hoistEither . note (stE1, stE2) $ dataType'
         hoistEither $ (if dataType' then Right else Left) (stE1, stE2)
         -- Types match exactly
 

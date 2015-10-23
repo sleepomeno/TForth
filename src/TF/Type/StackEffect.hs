@@ -10,7 +10,10 @@ import Control.Lens (makeWrapped)
 -- type DefiningOrNot = Either DefiningArg StreamArg
 data DefiningOrNot = Defining DefiningArg | NotDefining StreamArg deriving (Show,Eq,Ord)
 
-type IndexedStackType = (DataType, Maybe Int)
+-- type IndexedStackType = (DataType, Maybe Int)
+data IndexedStackType = IndexedStackType {
+    stackType :: DataType
+  , typeIndex :: (Maybe Int) } deriving (Show,Eq,Ord)
 type Identifier = Int
 type ClassName = String
 
@@ -91,3 +94,4 @@ makeLens ''StreamArg
 makeTraversals ''RuntimeSpecification
 makeTraversals ''DefiningOrNot
 makeLens ''ExecutionToken
+makeLens ''IndexedStackType

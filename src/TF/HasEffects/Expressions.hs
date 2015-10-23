@@ -152,7 +152,7 @@ instance HasStackEffects Expr where
     let effect = effects ^?! _head
     when (has (_before._head) effect) $ throwing (_ErrorE . _MalformedAssert) "No before allowed!"
     unless (1 == length (view _after effect)) $ throwing (_ErrorE . _MalformedAssert) "Exactly One After data type!"
-    let xts = toListOf (_after.traverse._1._NoReference._ExecutionType._exectokenRuntimeSpecified._Just._KnownR) effect
+    let xts = toListOf (_after.traverse._stackType._NoReference._ExecutionType._exectokenRuntimeSpecified._Just._KnownR) effect
     unless (1 == length xts) $ throwing (_ErrorE . _MalformedAssert) "Exactly one xt data type!"
 
     let eff = xts ^?! _head
@@ -164,7 +164,7 @@ instance HasStackEffects Expr where
 
     uniqueIdentifier <- lift $ _identifier <<+= 1
     -- let executeEffs = effsAsTuples $ compOrExec [eff & _before %~ ((Wildcard, Just uniqueIdentifier):)] 
-    let executeEffs = effsAsTuples $ (effects' & chosen' .~ [eff & _before %~ ((Wildcard, Just uniqueIdentifier):)] )
+    let executeEffs = effsAsTuples $ (effects' & chosen' .~ [eff & _before %~ (IndexedStackType Wildcard  (Just uniqueIdentifier):)] )
 
     return $ withoutIntersect $ executeEffs
 

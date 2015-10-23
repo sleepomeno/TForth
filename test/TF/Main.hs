@@ -113,8 +113,8 @@ dynamic = do
 
     it "all types are dynamic in the effect of the addition word" $ do
       let result = check "+"
-      result `shouldHave` (_Success._ParseState._effects._Wrapped._1.traverse._2._before.traverse._1.only Dynamic)
-      result `shouldHave` (_Success._ParseState._effects._Wrapped._1.traverse._2._after.traverse._1.only Dynamic)
+      result `shouldHave` (_Success._ParseState._effects._Wrapped._1.traverse._2._before.traverse._stackType.only Dynamic)
+      result `shouldHave` (_Success._ParseState._effects._Wrapped._1.traverse._2._after.traverse._stackType.only Dynamic)
     context "and allowDynamicInStackComments set to False" $ do
       let check = check' (defTestConfig & allCoreDynamic .~ True & allowDynamicInStackComments .~ False)
       it "type clashes on using dyn in a stack comment" $
@@ -192,7 +192,7 @@ simpleColonDefinition = do
     effect ^. _streamArgs `shouldBe` []
     length afterStack `shouldBe` 1
 
-    let topOfAfterStack = afterStack ^?! _head & fst
+    let topOfAfterStack = afterStack ^?! _head._stackType
 
     let isntReference :: DataType -> Bool
         isntReference x = case x of
@@ -208,8 +208,8 @@ simpleColonDefinition = do
   it "has compiled the correct stack effect 2" $ do
     let effect' = getColonDefEffects "foo" ": foo dup 3 + ;"
 
-    effect' `shouldHave` _Just._head._before._head._1._NoReference._PrimType.filtered (views _primtypeSymbol (== FT.N))
-    effect' `shouldHave` _Just._head._after._head._1._NoReference._PrimType.filtered (views _primtypeSymbol (== FT.N))
+    effect' `shouldHave` _Just._head._before._head._stackType._NoReference._PrimType.filtered (views _primtypeSymbol (== FT.N))
+    effect' `shouldHave` _Just._head._after._head._stackType._NoReference._PrimType.filtered (views _primtypeSymbol (== FT.N))
 
 colonDefStackComment = do
   let check = fst . runChecker' (defTestConfig & allowForcedEffects .~ True)
@@ -228,18 +228,18 @@ oopFeature = do
   context "inferring the type of a field" $
     it "infers N when its used in the context of addition" $ 
 
-      check  "object class var text end-class button button new text @ 4 +"`shouldHave` (_Success._ParseState._classFields.at "button"._Just.traverse.filtered (\(x,_) -> x == "text")._2._InferredByField._after._head._1._Reference._NoReference._PrimType.only FT.n)
+      check  "object class var text end-class button button new text @ 4 +"`shouldHave` (_Success._ParseState._classFields.at "button"._Just.traverse.filtered (\(x,_) -> x == "text")._2._InferredByField._after._head._stackType._Reference._NoReference._PrimType.only FT.n)
   it "taking the type from the class definition" $ 
   
-      check "object class var text ( *char ) end-class button"`shouldHave` (_Success._ParseState._classFields.at "button"._Just.traverse.filtered (\(x,_) -> x == "text")._2._ByFieldDefinition._after._head._1._Reference._NoReference._PrimType.only FT.char)
+      check "object class var text ( *char ) end-class button"`shouldHave` (_Success._ParseState._classFields.at "button"._Just.traverse.filtered (\(x,_) -> x == "text")._2._ByFieldDefinition._after._head._stackType._Reference._NoReference._PrimType.only FT.char)
 
   context "deriving classes" $
     context "fields are derived" $ do
       it "when the field type was defined in the superclass definition" $ 
-        check  "object class var size ( *n ) end-class button button class end-class subbutton" `shouldHave` (_Success._ParseState._classFields.at "subbutton"._Just.traverse.filtered (\(x,_) -> x == "size")._2._ByFieldDefinition._after._head._1._Reference._NoReference._PrimType.only FT.n)
+        check  "object class var size ( *n ) end-class button button class end-class subbutton" `shouldHave` (_Success._ParseState._classFields.at "subbutton"._Just.traverse.filtered (\(x,_) -> x == "size")._2._ByFieldDefinition._after._head._stackType._Reference._NoReference._PrimType.only FT.n)
 
       it "when the field type was inferred" $ 
-        check "object class var size end-class button button class end-class subbutton button new size @ 2 +" `shouldHave` (_Success._ParseState._classFields.at "subbutton"._Just.traverse.filtered (\(x,_) -> x == "size")._2._InferredByField._after._head._1._Reference._NoReference._PrimType.only FT.n)
+        check "object class var size end-class button button class end-class subbutton button new size @ 2 +" `shouldHave` (_Success._ParseState._classFields.at "subbutton"._Just.traverse.filtered (\(x,_) -> x == "size")._2._InferredByField._after._head._stackType._Reference._NoReference._PrimType.only FT.n)
 
   context "checking method implementations" $ do
     context "favours the forced effect specified on class definition" $ do
@@ -294,54 +294,54 @@ create = do
         let effects1 = getCreateDefEffects name1 colonDef
             effects2 = getCreateDefEffects name2 colonDef
 
-        effects1 `shouldHave` _head._after._head._1._Reference._NoReference._PrimType._primtypeSymbol.filtered (== FT.N)
-        effects2 `shouldHave` _head._after._head._1._Reference._NoReference._PrimType._primtypeSymbol.filtered (== FT.Char)
+        effects1 `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType._primtypeSymbol.filtered (== FT.N)
+        effects2 `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType._primtypeSymbol.filtered (== FT.Char)
   context "when a create-word has a does> part which sets the cell type" $ do
     it "where the create does not have a comma and constraints the type" $ do
       let prog =  ": foo create does> @ 4 + ; foo bla"
           bla = getCreateDefEffects "bla" prog
-      bla `shouldHave` _head._after._head._1._NoReference._PrimType._primtypeSymbol.only FT.N
+      bla `shouldHave` _head._after._head._stackType._NoReference._PrimType._primtypeSymbol.only FT.N
 
       let foo = getColonDefEffects "foo" prog
-      foo `shouldHave` _head._streamArgs._head._Defining._runtimeEffect._Just._head._1._after._head._1._NoReference._PrimType._primtypeSymbol.only N
+      foo `shouldHave` _head._streamArgs._head._Defining._runtimeEffect._Just._head._1._after._head._stackType._NoReference._PrimType._primtypeSymbol.only N
     it "where the type is constrained by a later comma" $ do
       let prog = ": foo create does> @ + ; : bla foo 4 , ; bla bar"
           bar = getCreateDefEffects "bar" prog
-      bar `shouldHave` _head._before._head._1._NoReference._PrimType._primtypeSymbol.only N
-      bar `shouldHave` _head._after._head._1._NoReference._PrimType._primtypeSymbol.only N
+      bar `shouldHave` _head._before._head._stackType._NoReference._PrimType._primtypeSymbol.only N
+      bar `shouldHave` _head._after._head._stackType._NoReference._PrimType._primtypeSymbol.only N
 
     it "where the create does not have a comma and does not constrain the type" $ do
       let prog =  ": foo create does> dup ; foo bla"
           bla = getCreateDefEffects "bla" prog
-      bla `shouldHave` _head._after.traverse._1._Reference._UnknownType
+      bla `shouldHave` _head._after.traverse._stackType._Reference._UnknownType
 
   context "when there is a create-comma" $ do
     it "the resulting word has an unknown type" $ do
       let prog = ": foo create , ; foo bla"
           bla = getCreateDefEffects "bla" prog
-      bla `shouldHave` _head._after._head._1._Reference._UnknownType
+      bla `shouldHave` _head._after._head._stackType._Reference._UnknownType
     it "and the resulting word's type is constrained with store" $ do
       let prog = ": foo create , ; foo bla 3 bla !"
           bla = getCreateDefEffects "bla" prog
-      bla `shouldHave` _head._after._head._1._Reference._NoReference._PrimType._primtypeSymbol.only N
+      bla `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType._primtypeSymbol.only N
     it "and the resulting word's type was constrained by comma outside the initial create" $ do
       let prog = "9 : foo create , ; foo bla 3 bla !"
           bla = getCreateDefEffects "bla" prog
-      bla `shouldHave` _head._after._head._1._Reference._NoReference._PrimType._primtypeSymbol.only N
+      bla `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType._primtypeSymbol.only N
     it "and the resulting word's type was constrained by comma inside the initial create" $ do
       let prog = ": foo create 7 , ; foo bla 3 bla !"
           bla = getCreateDefEffects "bla" prog
-      bla `shouldHave` _head._after._head._1._Reference._NoReference._PrimType._primtypeSymbol.only N
+      bla `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType._primtypeSymbol.only N
     it "the does> effect constrains the effect" $ do
       let prog = ": foo create , does> @ + ; 9 foo bla foo bar"
           bla = getCreateDefEffects "bla" prog
-      bla `shouldHave` _head._before._head._1._NoReference._PrimType._primtypeSymbol.only N
-      bla `shouldHave` _head._after._head._1._NoReference._PrimType._primtypeSymbol.only N
+      bla `shouldHave` _head._before._head._stackType._NoReference._PrimType._primtypeSymbol.only N
+      bla `shouldHave` _head._after._head._stackType._NoReference._PrimType._primtypeSymbol.only N
       let bar = getCreateDefEffects "bar" prog
-      bar `shouldHave` _head._before._head._1._NoReference._PrimType._primtypeSymbol.only U
-      bar `shouldHave` _head._after._head._1._NoReference._PrimType._primtypeSymbol.only U
-      bar `shouldHave` element 1._before._head._1._NoReference._PrimType._primtypeSymbol.only N
-      bar `shouldHave` element 1._after._head._1._NoReference._PrimType._primtypeSymbol.only N
+      bar `shouldHave` _head._before._head._stackType._NoReference._PrimType._primtypeSymbol.only U
+      bar `shouldHave` _head._after._head._stackType._NoReference._PrimType._primtypeSymbol.only U
+      bar `shouldHave` element 1._before._head._stackType._NoReference._PrimType._primtypeSymbol.only N
+      bar `shouldHave` element 1._after._head._stackType._NoReference._PrimType._primtypeSymbol.only N
 
     it "and the resulting word's type was constrained by comma outside the initial create and later a wrong type gets stored in it" $ 
       check "9 : foo create , ; foo bla 8 0= bla !" `shouldHave` (_Failure._Clash)
@@ -366,14 +366,14 @@ create = do
 
       -- length effects `shouldBe` 1
       effects `shouldHave` to length.only 1
-      effects `shouldHave` _head._after._head._1._Reference._UnknownType
+      effects `shouldHave` _head._after._head._stackType._Reference._UnknownType
     it "and that unknown type depends on a wildcard argument, the resulting definition has the correct type when the wildcard is unified with a certain type" $ do
       let colonDef = ": foo create dup , ; bl foo " ++ name
           name = "asd"
           effects = getCreateDefEffects name colonDef
       -- length effects `shouldBe` 1
       effects `shouldHave` to length.only 1
-      effects `shouldHave` _head._after._head._1._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== Char))
+      effects `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== Char))
 
 
     context "when the created word is of known type" $ do
@@ -385,7 +385,7 @@ create = do
 
           -- length effects `shouldBe` 1
           effects `shouldHave` to length.only 1
-          effects `shouldHave` _head._after._head._1._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
+          effects `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
       it "there is a dictionary entry with exactly that type for that name 2" $ do
           let name = "blub"
               colonDef = ": myfunc create 0 , ; myfunc " ++ name
@@ -394,7 +394,7 @@ create = do
 
           -- length effects `shouldBe` 1
           effects `shouldHave` to length.only 1
-          effects `shouldHave` _head._after._head._1._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
+          effects `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
       it "the dictionary entry's effect contains exactly one stream argument" $ do
           let name = "myfunc"
               colonDef = ": myfunc create 0 , ;"
@@ -415,13 +415,13 @@ create = do
             let program = "create " ++ name ++ " 0 4 ,"
                 effects = getCreateDefEffects name program
             effects `shouldHave` to length.only 1
-            effects `shouldHave` _head._after._head._1._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
+            effects `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
          context "and the value of that type was put on the stack before 'create'" $
            it "creates a dictionary entry with the correct type" $ do
                 let program = "bl create " ++ name ++ " ,"
                 let effects = getCreateDefEffects name program
                 effects `shouldHave` to length.only 1
-                effects `shouldHave` _head._after._head._1._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== Char))
+                effects `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== Char))
          it "there is a error if a value of incorrect type is attempted to be written into that reference" $ do
            let program = "create foo 4 , 9 0= foo !"
            check program `shouldHave` (_Failure._Clash)
@@ -431,23 +431,23 @@ create = do
             let program = "create " ++ name
                 effects = getCreateDefEffects name program
             effects `shouldHave` to length.only 1
-            effects `shouldHave` _head._after._head._1._Reference._UnknownType
+            effects `shouldHave` _head._after._head._stackType._Reference._UnknownType
          it "type checks dereferencing that word" $ do
             let program = "create " ++ name ++ " " ++ name ++ " @"
             check program `shouldHave` _Success
          it "storing a value afterwards sets the reference value of that variable" $ do
             let program = "create foo 3 foo !"
                 effects = getCreateDefEffects "foo" program
-            effects `shouldHave` _head._after._head._1._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
+            effects `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
          it "reading from that variable and using that value of unknown in such a way that the type gets known, sets the referenced type of the variable" $ do
             let program = "create foo foo @ 3 +"
                 effects = getCreateDefEffects "foo" program
-            effects `shouldHave` _head._after._head._1._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
+            effects `shouldHave` _head._after._head._stackType._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
     it "inferring a reference to a reference of known type works" $ do
       let name = "bar"
           program = "create foo 3 , create " ++ name ++ " " ++ name ++ " @ @ 3 +"
           effects = getCreateDefEffects name program
-      effects `shouldHave` _head._after._head._1._Reference._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
+      effects `shouldHave` _head._after._head._stackType._Reference._Reference._NoReference._PrimType.filtered (views _primtypeSymbol (== N))
     context "inferring a reference to a reference of unknown type works" $ do
 
         it "when one reference is stored in another" $ do
@@ -456,8 +456,8 @@ create = do
               program = "create " ++ ref2 ++ " create " ++ ref1 ++ " " ++ ref2 ++ " " ++ ref1 ++ " !"
           let ref1effs = getCreateDefEffects ref1 program
               ref2effs = getCreateDefEffects ref2 program
-          let unknownType1 = ref1effs ^? _head._after._head._1._Reference._Reference._UnknownType
-          let unknownType2 = ref2effs ^? _head._after._head._1._Reference._UnknownType
+          let unknownType1 = ref1effs ^? _head._after._head._stackType._Reference._Reference._UnknownType
+          let unknownType2 = ref2effs ^? _head._after._head._stackType._Reference._UnknownType
 
           unknownType1 `shouldBe` unknownType2
         it "when one reference is stored in another and one of the reference types is later inferred to a concrete type" $ do
@@ -466,8 +466,8 @@ create = do
               program = "create " ++ ref2 ++ " create " ++ ref1 ++ " " ++ ref2 ++ " " ++ ref1 ++ " ! " ++ ref2 ++ " @ 3 +"
           let ref1effs = getCreateDefEffects ref1 program
               ref2effs = getCreateDefEffects ref2 program
-          let knownType1 = ref1effs ^? _head._after._head._1._Reference._Reference._NoReference
-          let knownType2 = ref2effs ^? _head._after._head._1._Reference._NoReference
+          let knownType1 = ref1effs ^? _head._after._head._stackType._Reference._Reference._NoReference
+          let knownType2 = ref2effs ^? _head._after._head._stackType._Reference._NoReference
 
           knownType1 `shouldBe` knownType2
 
@@ -598,7 +598,7 @@ main = hspec $
       let name = "foo"
           colonDef = ": " ++ name ++ " [ bl ] literal ;"
           effects = getColonDefEffects name colonDef
-      effects `shouldHave` _Just._head._after._head._1._NoReference._PrimType._primtypeSymbol.filtered (== FT.Char)
+      effects `shouldHave` _Just._head._after._head._stackType._NoReference._PrimType._primtypeSymbol.filtered (== FT.Char)
 
     context "OOP Features" oopFeature
     

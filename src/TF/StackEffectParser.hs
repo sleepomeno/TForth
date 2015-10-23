@@ -106,7 +106,7 @@ typeWithIndex type' = do
               PrimType primType -> view _asString primType
               ExecutionType _ -> "xt"
   index <- optionMaybe (fmap digitToInt digit) 
-  return (type'', index)
+  return $ IndexedStackType type'' index
 
 -- a list of parsers which parse a string indicating a single type
 singleTypes :: ParseStackEffectsM [ParseStackEffectsM IndexedStackType]
@@ -197,7 +197,7 @@ executionTypeWithIndex = do
 
     let type'' = (!! degreeRef) . iterate Reference $ NoReference $ ExecutionType (ExecutionToken FT.XD runtimeEff)
     index <- optionMaybe (fmap digitToInt digit) 
-    return (type'', index)
+    return $ IndexedStackType type'' index
 
 defParseStackEffectsConfig :: ParseStackEffectsConfig
 defParseStackEffectsConfig = ParseStackEffectsConfig [] False False

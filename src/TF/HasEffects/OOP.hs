@@ -37,7 +37,7 @@ getStackEffects' (NewObject cOrE) = do
         -- name = case cOrE of { Left x -> x; Right x -> x }
     let name = cOrE ^. chosen'
         -- eff = [StackEffect [] [] [(NoReference $ _ClassType # name, Just 1)]]
-        eff = [StackEffect [] [] [(NoReference $ ClassType name, Just 1)]]
+        eff = [StackEffect [] [] [IndexedStackType (NoReference $ ClassType name) (Just 1)]]
     -- return $ withoutIntersect (effsAsTuples eff)
     return $ withoutIntersect (effsAsTuples $ cOrE & compOrExecIso.chosen .~ eff)
 
@@ -124,12 +124,12 @@ getStackEffects' (NoName stackCommentEffects exprs clazz method) = do
                     checkClassTypeArgument eff = do
                       uniqueIdentifier <- _identifier <<+= 1
                       let topConsumingType = preview (_before._head) eff :: Maybe IndexedStackType
-                          classType = (NoReference $ ClassType clazz, Just uniqueIdentifier)
+                          classType = IndexedStackType (NoReference $ ClassType clazz) (Just uniqueIdentifier)
                       case topConsumingType of
                        Nothing -> do
                          -- iopC $ "DDDDDDDDDDDd"
                          return $ eff & _before %~ (classType :) & _after %~ (++ [classType])
-                       Just indexedType@(Wildcard, i) -> do
+                       Just indexedType@(IndexedStackType Wildcard  i) -> do
                          -- iopC $ "CCCCCCCCCCC"
                          let replaceWith indexedType target =  target.traverse.filtered (== indexedType) .~ classType
                              replaceStreamTypes indexedType eff = eff
@@ -137,13 +137,13 @@ getStackEffects' (NoName stackCommentEffects exprs clazz method) = do
                                                                   & _streamArgs.traverse._Defining._argType._Just.filtered (== indexedType) .~ classType
                          return $ eff & _before %~ tail & _before %~ (classType:) & replaceWith  indexedType _before
                                       & replaceWith indexedType _after & replaceStreamTypes indexedType
-                       Just indexedType@(NoReference (ClassType classname), i) -> do
+                       Just indexedType@(IndexedStackType (NoReference (ClassType classname)) i) -> do
 
                          iopC "BBBBBBBBBBBBBBBBB"
                          isSubtype <- (NoReference . ClassType $ clazz) `isSubtypeOf` (NoReference . ClassType $ classname)
 
                          unless isSubtype $ malformedMethodEffect
-                         return $ eff & _before._head._1._NoReference._ClassType .~ clazz
+                         return $ eff & _before._head._stackType._NoReference._ClassType .~ clazz
                        Just _ -> do
                          -- iopC "AAAAAAAAAAAAAAAAAAAAAA"
 

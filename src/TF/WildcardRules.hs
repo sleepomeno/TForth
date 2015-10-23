@@ -44,8 +44,8 @@ renameWildcards = applyWildcardRule renameWildcards'
         iop $ show wildcardsStE2
 
             -- maxIndex = maximum . map snd $ wildcardsStE1 ++ wildcardsStE2
-        let maxIndex = maximum . (0:) . toListOf (traverse._2._Just) $ wildcardsStE1 ++ wildcardsStE2
-            wildcardIndicesMatch x y = guard (snd x == snd y) >> Just x
+        let maxIndex = maximum . (0:) . toListOf (traverse._typeIndex._Just) $ wildcardsStE1 ++ wildcardsStE2
+            wildcardIndicesMatch x y = guard (x ^. _typeIndex == y ^. _typeIndex) >> Just x
 
         let wildcardMatches :: [Maybe IndexedStackType]
             wildcardMatches = map (uncurry wildcardIndicesMatch) $ liftM2 (,) wildcardsStE1 wildcardsStE2 
@@ -58,10 +58,10 @@ renameWildcards = applyWildcardRule renameWildcards'
 
         logApplication "renameWildcards"
 
-        -- let setNewIndex  = sameWildcard & _2 ?~ (maxIndex + 1)
-        let hasSameWildcard (t,i') = i' == sameWildcard ^. _2 && baseType t == baseType (sameWildcard ^. _1)
-            performSubstitution eff = eff & _before.mapped.filtered hasSameWildcard._2 ?~ maxIndex+1
-                                          & _after.mapped.filtered hasSameWildcard._2  ?~ maxIndex+1
+        -- let setNewIndex  = sameWildcard & _typeIndex ?~ (maxIndex + 1)
+        let hasSameWildcard (IndexedStackType t i') = i' == sameWildcard ^. _typeIndex && baseType t == baseType (sameWildcard ^. _stackType)
+            performSubstitution eff = eff & _before.mapped.filtered hasSameWildcard._typeIndex ?~ maxIndex+1
+                                          & _after.mapped.filtered hasSameWildcard._typeIndex  ?~ maxIndex+1
         modify (fmap performSubstitution)
         local ((storedEffects._2) .~ performSubstitution stE2) renameWildcards'
     
@@ -72,8 +72,8 @@ sameDegree = applyWildcardRule sameDegree'
       sameDegree' :: WildcardRuleM StackEffects 
       sameDegree' = do
         (stE1, stE2) <- view storedEffects
-        topOfStackIndexed@(topOfStack, _) <-  firstOf (_after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects 
+        topOfStackIndexed@(IndexedStackType topOfStack  _) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(IndexedStackType topOfArgs topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects 
 
         assert (isWildcard topOfStackIndexed && isWildcard topOfArgsIndexed) 
         let stE2wildcards = getWildcards stE2
@@ -90,7 +90,8 @@ sameDegree = applyWildcardRule sameDegree'
         when (hasUnknownBaseType topOfStack) $
             addTypeInfo topOfArgs topOfStackIndexed
 
-        let substitutor = first baseType topOfStackIndexed
+        -- let substitutor = first baseType topOfStackIndexed
+        let substitutor = topOfStackIndexed & _stackType %~ baseType -- first baseType topOfStackIndexed
             shouldBeSubstituted t = isWildcard t && getIndex t == topOfArgsIndex
             performSubstitution eff = eff & _before.mapped.filtered shouldBeSubstituted .~ substitutor
                                       & _streamArgs.traverse._Defining._argType._Just.filtered shouldBeSubstituted .~ substitutor
@@ -109,8 +110,8 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m > n
       oldWildcardDegreeIsGreater' :: WildcardRuleM StackEffects
       oldWildcardDegreeIsGreater' = do 
         (stE1, stE2) <- view storedEffects
-        topOfStackIndexed@(topOfStack, topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs, topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
+        topOfStackIndexed@(IndexedStackType topOfStack  topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(IndexedStackType topOfArgs  topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
         iopW "top of stack indexed"
         iopW $ show topOfStackIndexed
 
@@ -136,7 +137,8 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m > n
             addTypeInfo topOfArgs topOfStackIndexed
         wildcardType <- getWildcardBaseType topOfStack topOfArgs
 
-        let substitutor = first ((!! (m-n)) . iterate Reference . setBaseType wildcardType) (baseType topOfStack, topOfStackIndex)
+        -- let substitutor = first ((!! (m-n)) . iterate Reference . setBaseType wildcardType) (baseType topOfStack, topOfStackIndex)
+        let substitutor = topOfStackIndexed & _stackType %~ baseType & _stackType %~ ((!! (m-n)) . iterate Reference . setBaseType wildcardType) -- first ((!! (m-n)) . iterate Reference . setBaseType wildcardType) (baseType topOfStack, topOfStackIndex)
             performSubstitution eff = eff & _before.mapped.likeArgsIndex .~ substitutor &
                          _after.mapped.likeArgsIndex .~ substitutor  
                           -- & _streamArgs.traverse._Defining._argType._Right.likeArgsIndex .~ substitutor
@@ -165,8 +167,8 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m < n
       newWildcardDegreeIsGreater' :: WildcardRuleM StackEffects
       newWildcardDegreeIsGreater' = do 
         (stE1, stE2) <- view storedEffects
-        topOfStackIndexed@(topOfStack,topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
+        topOfStackIndexed@(IndexedStackType topOfStack topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(IndexedStackType topOfArgs topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
 
         assert (isWildcard topOfStackIndexed && isWildcard topOfArgsIndexed)
         let stE2wildcards = getWildcards stE2
@@ -188,11 +190,11 @@ Both tops are wildcards. topofstack kommt nicht in stE2 vor und m < n
 
         let setBaseWildcardType = setBaseType wildcardType
 
-        let adjustReferenceType = first $ (!! (n-m)) . iterate Reference . setBaseWildcardType
-            adjustBaseWildcardType = over _1 setBaseWildcardType 
+        let adjustReferenceType = over _stackType $ (!! (n-m)) . iterate Reference . setBaseWildcardType
+            adjustBaseWildcardType = over _stackType setBaseWildcardType 
 
         let substitutor :: IndexedStackType
-            substitutor = adjustReferenceType (baseType topOfArgs, topOfArgsIndex)
+            substitutor = adjustReferenceType (topOfArgsIndexed & _stackType %~ baseType) -- IndexedStackType (baseType topOfArgs) topOfArgsIndex
                            
             isTopOfStackType wc = isWildcard wc && getIndex wc == topOfStackIndex
             isTopOfArgsType wc = isWildcard wc && getIndex wc == topOfArgsIndex
@@ -218,8 +220,8 @@ oldTopTypeNotWildcard = applyWildcardRule oldTopTypeNotWildcard'
     oldTopTypeNotWildcard' = do
         (stE1, stE2) <- view storedEffects
 
-        topOfStackIndexed@(topOfStack,topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
+        topOfStackIndexed@(IndexedStackType topOfStack topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(IndexedStackType topOfArgs topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
 
         assert (not . isWildcard $ topOfStackIndexed)
         assert (isWildcard topOfArgsIndexed)
@@ -231,7 +233,7 @@ oldTopTypeNotWildcard = applyWildcardRule oldTopTypeNotWildcard'
 
         logTopTypes topOfStackIndexed topOfArgsIndexed "oldTopTypeNotWildcard"
 
-        let substitutor = topOfStackIndexed & _1 %~ removeDegree n -- & makeResolved
+        let substitutor = topOfStackIndexed & _stackType %~ removeDegree n -- & makeResolved
 
             adjustSte2 eff = eff & _before.mapped.filtered isTopOfArgsType .~ substitutor
                                  & _after.mapped.filtered isTopOfArgsType .~ substitutor
@@ -256,8 +258,8 @@ newTopTypeNotWildcard = applyWildcardRule newTopTypeNotWildcard'
      newTopTypeNotWildcard' = do
         (stE1, stE2) <- view storedEffects
 
-        topOfStackIndexed@(topOfStack,topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
-        topOfArgsIndexed@(topOfArgs,topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
+        topOfStackIndexed@(IndexedStackType topOfStack topOfStackIndex) <-  firstOf (_after.traverse) stE1 & orReturnEffects
+        topOfArgsIndexed@(IndexedStackType topOfArgs topOfArgsIndex) <-  firstOf (_before.traverse) stE2 & orReturnEffects
 
         assert (isWildcard topOfStackIndexed) 
         assert (not $ isWildcard topOfArgsIndexed)
@@ -272,8 +274,8 @@ newTopTypeNotWildcard = applyWildcardRule newTopTypeNotWildcard'
         addTypeInfo topOfStack topOfArgsIndexed
 
         let substitutor ::  IndexedStackType
-            substitutor = topOfArgsIndexed & _1 %~ removeDegree m
-            substituteBaseType (t, i) = (setBaseType (baseType topOfArgs) t, topOfArgsIndex) & _1 %~ removeDegree m
+            substitutor = topOfArgsIndexed & _stackType %~ removeDegree m
+            substituteBaseType (IndexedStackType t  i) = (IndexedStackType (setBaseType (baseType topOfArgs) t)  topOfArgsIndex) & _stackType %~ removeDegree m
             isTopOfStackType wc = isWildcard wc && getIndex wc == topOfStackIndex
             
         local (storedEffects._1._after %~ tail >>>
@@ -285,7 +287,7 @@ newTopTypeNotWildcard = applyWildcardRule newTopTypeNotWildcard'
 
 hasUnknownBaseType = has _UnknownType . baseType
 addTypeInfo possibleUnknownType concreteType = when (hasUnknownBaseType possibleUnknownType) $  do 
-          resolveUnknown ((baseType possibleUnknownType) ^?! _UnknownType) (first baseType concreteType)
+          resolveUnknown ((baseType possibleUnknownType) ^?! _UnknownType) (concreteType & _stackType %~ baseType)
 
 adjustReferenceDegreeOfPossibleUnknownType :: DataType -> Int -> t -> WildcardRuleM ()
 adjustReferenceDegreeOfPossibleUnknownType topOfStack diff currentRefDegree = do
@@ -302,7 +304,7 @@ isCorrectCreatedWord identifier (w, _)  = has _UnknownType (baseType w)  && ((ba
   
 
 resolveUnknown :: Identifier -> IndexedStackType -> WildcardRuleM ()
-resolveUnknown identifier (arg,_) = blocked $ do
+resolveUnknown identifier (IndexedStackType arg _) = blocked $ do
   iopW $ "RRRRRRRRRRRRRR"
   lift . lift $ tell [(ResolveUnknown identifier arg)] 
 
@@ -310,7 +312,7 @@ updateFields :: (StackEffect -> StackEffect) -> ClassName -> [(Variable, OOField
 updateFields updateStackEffect _ fields = for fields $ second (fmap updateStackEffect) 
 
 isWildcard :: IndexedStackType -> Bool
-isWildcard (t, _) = isWildcard' t
+isWildcard (IndexedStackType t  _) = isWildcard' t
 
 isWildcard' (WildcardWrapper) = True
 isWildcard' (Wildcard) = True

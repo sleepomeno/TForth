@@ -68,8 +68,8 @@ getCommonSupertype'' effs = runMaybeT $ foldM (\result another -> do
                                       hoistMaybe sup) (head effs) (tail effs)
 constraints :: StackEffect -> [(Int, Int)]
 constraints stEff =
-  [(i,i') | (i , (type1, typeIndex1)) <- typeByPosition,
-            (i', (type2, typeIndex2)) <- typeByPosition,
+  [(i,i') | (i , IndexedStackType type1 typeIndex1) <- typeByPosition,
+            (i', IndexedStackType type2 typeIndex2) <- typeByPosition,
              type1 == type2,
              typeIndex1 == typeIndex2,
              i /= i', typeIndex1 /= Nothing] 
@@ -99,13 +99,13 @@ effectIsSubtypeOf eff1 eff2 =  (`runContT` id) $ callCC $ \exit -> do
   when (not $ sameLengths && streamArgsSameKind) $ exit (return False)
   -- iop "after argskind"
 
-  forM_ (zip before1 before2) $ \((t1,_),(t2,_)) -> do
+  forM_ (zip before1 before2) $ \((IndexedStackType t1 _),(IndexedStackType t2 _)) -> do
     isContravariant <- lift $ t2 `isSubtypeOf` t1
     iop $ "iscontravariant: " ++ show isContravariant
     when (not isContravariant) $ exit (return False)
   iop "FUUUU"
 
-  forM_ (zip after1 after2) $ \((t1,_),(t2,_)) -> do
+  forM_ (zip after1 after2) $ \((IndexedStackType t1  _),(IndexedStackType t2 _)) -> do
     isCovariant <- lift $ t1 `isSubtypeOf` t2
     iop $ "covariant: " <> (show isCovariant)
     iop $ (show t1)

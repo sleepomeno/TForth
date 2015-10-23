@@ -47,7 +47,7 @@ _KnownRuntimeSpecification = _Right
 
 type ReferenceDegree = Int
 
-getIndex t = t ^. _2
+getIndex t = t ^. _typeIndex
 
 
 data ChangeState =   ReferenceDegree Identifier Int 
@@ -65,7 +65,7 @@ type Description = String
 
 _NoReferenceIndexed :: Prism IndexedStackType IndexedStackType IndexedStackType IndexedStackType
 _NoReferenceIndexed = prism id (\s -> case s of
-                                  noref@(NoReference _, _) -> Right noref
+                                  noref@(IndexedStackType (NoReference _) _) -> Right noref
                                   x -> Left x)
 
 data Optional = Sem Semantics | NotSet | Undefined deriving (Show,Eq)

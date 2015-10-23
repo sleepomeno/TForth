@@ -111,6 +111,6 @@ getStackEffects' (BeginUntil tokens) = do
 
 
      lastDatatypeIsFlag eff = fmap (has $ _Just.only True) . runMaybeT $ do
-       let mLastType = eff ^? (_after._head._1)
+       let mLastType = eff ^? (_after._head._stackType)
        lastType <- hoistMaybe mLastType
        lift $ lastType `isSubtypeOf` (NoReference $ PrimType flag)

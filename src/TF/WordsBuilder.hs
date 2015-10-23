@@ -74,9 +74,9 @@ addInfo (EFFECT e c) = do
 
   shouldDoDynTransform <- view allCoreDynamic
   let effects'' = if shouldDoDynTransform then
-                    ((effects' & traverse._before.traverse._1 %~ setBaseType Dynamic
-                             & traverse._after.traverse._1 %~ setBaseType Dynamic) :: [StackEffect])
-                             & traverse._streamArgs.traverse._Defining._argType._Just._1 %~ setBaseType Dynamic
+                    ((effects' & traverse._before.traverse._stackType %~ setBaseType Dynamic
+                             & traverse._after.traverse._stackType %~ setBaseType Dynamic) :: [StackEffect])
+                             & traverse._streamArgs.traverse._Defining._argType._Just._stackType %~ setBaseType Dynamic
                   else
                     effects'
   effects''' <- addTypeIndices effects''
@@ -106,8 +106,8 @@ addTypeIndices effects = do
         addTypeIndex x = return x
           
     forM effects $ \(StackEffect before args after) -> do
-      before' <- forM before $ \(t, i) -> (t,) <$> addTypeIndex i
-      after' <- forM after $ \(t, i) -> (t,) <$> addTypeIndex i
+      before' <- forM before $ \(IndexedStackType t i) -> (t,) <$> addTypeIndex i
+      after' <- forM after $ \(IndexedStackType t i) -> (t,) <$> addTypeIndex i
       return (StackEffect before args after)
       
   return transformedEffects

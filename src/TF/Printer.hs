@@ -103,8 +103,7 @@ bTypeNice (ExecutionType (ExecutionToken _ runtimeSpec)) = text "xt:[" <+> case 
                        
 stackEffectNice (StackEffect b args a ) = text "(" <+> (hsep $ showTypes $ reverse b) <+> (hsep $ map definingOrNot args) <+> text " -- " <+> (hsep $ showTypes $ reverse a) <+> text ")"
   where
-    -- showTypes types = map (\(t,i) -> dataTypeNice t <+> (text . show $ i)) types
-    showTypes types = map (\(t,i) -> dataTypeNice t) types
+    showTypes types = map (\(IndexedStackType t i) -> dataTypeNice t <+> (text . show $ i)) types
 
 stackEffect(StackEffect b streamArgs a) = text "Effect" $+$
                                    nested (text "Before") $+$
@@ -233,12 +232,12 @@ expr (Require file) = text $ "Require: " <> file
 showClass clazz oldClass fields methods = text ("CLASS " ++ clazz ++ ", derived from " ++ oldClass) $+$ nested ((showFields fields) $+$ showMethods methods)
 
 
-dataType (UnknownType identifier, index) = text $ "UnknownType with identifier " ++ show identifier ++ " and index " ++ show index
-dataType (Dynamic, index) = text $ "Dynamic with Index " ++ show index
-dataType (Wildcard, index) = text $ "Wildcard with Index " ++ show index
-dataType (WildcardWrapper, index) = text $ "WildcardWrapper with Index " ++ show index
-dataType (Reference x, index) = text "Reference" $+$ nested (dataType (x, index))
-dataType (NoReference basicType, index) = case basicType of 
+dataType (IndexedStackType (UnknownType identifier) index) = text $ "UnknownType with identifier " ++ show identifier ++ " and index " ++ show index
+dataType (IndexedStackType Dynamic index) = text $ "Dynamic with Index " ++ show index
+dataType (IndexedStackType Wildcard index) = text $ "Wildcard with Index " ++ show index
+dataType (IndexedStackType WildcardWrapper index) = text $ "WildcardWrapper with Index " ++ show index
+dataType (IndexedStackType (Reference x) index) = text "Reference" $+$ nested (dataType (IndexedStackType x index))
+dataType (IndexedStackType (NoReference basicType) index) = case basicType of 
   PrimType (PT sym _ _ asString) ->  text "PrimType" <+> text (show sym) <+> text ", as string:" <+> text asString <+> text (", Index is " ++ show index)
   ClassType className -> text ("ClassType " ++ className) <+> text (", Index is " ++ show index)
   ExecutionType token -> text "ExecutionType" $+$ nested (ppDoc token) 

@@ -72,22 +72,22 @@ removeWildcards effs = do
 
 resolveUnknownType :: Identifier -> DataType -> CheckerM ()
 resolveUnknownType identifier arg = blocked $ do
-  iopW "RESOLVE UNKNOWN TYPES OF"
+  -- iopW "RESOLVE UNKNOWN TYPES OF"
   targets1 <- toListOf (_definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isUnknownType) <$> getState 
   targets2 <- toListOf (_definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._streamArgs.traverse._Defining._argType._Just) <$> getState 
   targets3 <- toListOf (_definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._after.traverse.filtered isUnknownType) <$> getState 
   iopW . render . vcat . map P.dataType $ targets1 ++ targets2 ++ targets3
-  iopW $ "REPLACE WITH: " ++ (render . P.dataType $ (arg, 0))
+  -- iopW $ "REPLACE WITH: " ++ (render . P.dataType $ (arg, 0))
 
-  modifyState $ _definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isUnknownType._1 %~ setBaseType arg
-  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over _Just (first $ setBaseType arg)
-  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._before.traverse.filtered isUnknownType._1 %~ setBaseType arg
+  modifyState $ _definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isUnknownType._stackType %~ setBaseType arg
+  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over _Just (over _stackType $ setBaseType arg)
+  modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._before.traverse.filtered isUnknownType._stackType %~ setBaseType arg
   modifyState $ _classFields %~ imap (updateFields updateStackEffect)
   where
     isUnknownType = isCorrectCreatedWord identifier
-    hasUnknownArgType x = has (_argType._Just) x && has _UnknownType (baseType (x ^?! _argType._Just._1))
+    hasUnknownArgType x = has (_argType._Just) x && has _UnknownType (baseType (x ^?! _argType._Just._stackType))
     updateStackEffect :: StackEffect -> StackEffect
-    updateStackEffect stEff = stEff & _after.traverse.filtered isUnknownType._1 %~ setBaseType arg
+    updateStackEffect stEff = stEff & _after.traverse.filtered isUnknownType._stackType %~ setBaseType arg
 
 updateFields :: (StackEffect -> StackEffect) -> ClassName -> [(Variable, OOFieldSem)] -> [(Variable, OOFieldSem)]
 updateFields updateStackEffect _ fields = for fields $ second (fmap updateStackEffect)
@@ -97,16 +97,16 @@ adjustDegree identifier diff = do
      iopW $ "CHANGE REFERENCE DEGREES BY " ++ show diff ++ " OF"
      targets <- toListOf (_definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isTarget) <$> getState
      iopW . render . vcat . map P.dataType $ targets
-     modifyState $ _definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
+     modifyState $ _definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isTarget._stackType %~ (!! diff) . iterate Reference
   modifyState $ _classFields %~ imap (updateFields updateStackEffect)
 
   -- l4 . modifyState $ _definedWords'.traverse._ColDef.processedEffects._Checked.traverse._streamArgs.traverse._Defining.filtered hasUnknownArgType._argType %~ over (_Left._Just) ((!! diff) . iterate Reference)
   where
     isUnknownType = isCorrectCreatedWord identifier
     isTarget = isUnknownType
-    updateStackEffect stEff = stEff & _after.traverse.filtered isTarget._1 %~ (!! diff) . iterate Reference
+    updateStackEffect stEff = stEff & _after.traverse.filtered isTarget._stackType %~ (!! diff) . iterate Reference
 
-isCorrectCreatedWord identifier (w, _)  = has _UnknownType (baseType w)  && ((baseType w ^?! _UnknownType) == identifier)
+isCorrectCreatedWord identifier (IndexedStackType w  _)  = has _UnknownType (baseType w)  && ((baseType w ^?! _UnknownType) == identifier)
 
 applyWildcardRenaming' effs = do
   (result, _) <- unzip <$> mapM (uncurry renameWildcards >>> runWriterT) (zipzap effs)
@@ -256,26 +256,26 @@ handleArgs d@(NotDefining _) = return d
 handleArgs (Defining arg) = do
     let currentType = view _argType arg :: (Maybe IndexedStackType)
 
-    let typeOfArg = maybe (Left $ (Wildcard, Just 0)) Right currentType :: Either IndexedStackType IndexedStackType
+    let typeOfArg = maybe (Left $ IndexedStackType Wildcard  (Just 0)) Right currentType :: Either IndexedStackType IndexedStackType
     uniqueId <- _identifier <<+= 1
     uniqueId2 <- _identifier <<+= 1
     uniqueId3 <- _identifier <<+= 1
     -- let maybeRuntimeType = _Just.chosen.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe (Either [(StackEffect,StackEffect)] [(StackEffect,StackEffect)])
     -- let maybeRuntimeType = _Just.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
     let maybeRuntimeType = view _runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
-        initialRuntimeType = StackEffect [] [] [first Reference $ fromMaybe (Wildcard, Just 0) currentType]
-        defaultRuntimeType = StackEffect [] [] [first Reference defaultR]
+        initialRuntimeType = StackEffect [] [] [over _stackType Reference $ fromMaybe (IndexedStackType Wildcard  (Just 0)) currentType]
+        defaultRuntimeType = StackEffect [] [] [defaultR & _stackType %~ Reference]
         defaultR = case currentType of
-          Nothing -> (UnknownType uniqueId, Just uniqueId2)
-          Just (t, i) -> if baseType t == Wildcard then
-                           (setBaseType (UnknownType uniqueId) t, Just uniqueId2)
+          Nothing -> IndexedStackType (UnknownType uniqueId) (Just uniqueId2)
+          Just (IndexedStackType t  i) -> if baseType t == Wildcard then
+                           IndexedStackType (setBaseType (UnknownType uniqueId) t) (Just uniqueId2)
                          else
-                           (t, i)
+                           (IndexedStackType t i)
           -- Just x -> x
-        defaultRuntimeType' = StackEffect [] [] [first Reference defaultR']
+        defaultRuntimeType' = StackEffect [] [] [defaultR' & _stackType %~ Reference]
         defaultR' = case currentType of
           -- Nothing -> (UnknownType uniqueId, Just uniqueId2)
-          Nothing -> (WildcardWrapper, Just uniqueId3)
+          Nothing -> IndexedStackType WildcardWrapper ( Just uniqueId3)
           Just x -> x
 
     (runtimeType) <- if isJust maybeRuntimeType then

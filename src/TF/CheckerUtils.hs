@@ -129,9 +129,9 @@ effectsOfState = do
 replaceWrappers :: [StackEffect] -> CheckerM [StackEffect]
 replaceWrappers result = do 
   let wwrappersOfEff :: StackEffect -> [Int]
-      wwrappersOfEff eff = toListOf (_before.wrapperLens._2._Just) eff ++ toListOf (_after.wrapperLens._2._Just) eff
+      wwrappersOfEff eff = toListOf (_before.wrapperLens._typeIndex._Just) eff ++ toListOf (_after.wrapperLens._typeIndex._Just) eff
 
-      wrapperLens = traverse.filtered (\(t,_) -> baseType t == WildcardWrapper)
+      wrapperLens = traverse.filtered (\(IndexedStackType t _) -> baseType t == WildcardWrapper)
   let wrapperIndices = concatMap wwrappersOfEff result
 
   replacements <- forM (nub wrapperIndices) $ \i -> do
@@ -139,15 +139,16 @@ replaceWrappers result = do
     return (i, uniqueId)
 
   let changeWrappersToUnknown :: StackEffect -> StackEffect
-      changeWrappersToUnknown eff = eff & _before.wrapperLens %~ replaceWrapper & _after.wrapperLens %~ replaceWrapper
-      replaceWrapper (_, Nothing) = error "index of wildcardwrapper is always a just!"
-      replaceWrapper (t, Just i) =
+      changeWrappersToUnknown eff = eff & _before.wrapperLens %~ replaceWrapper &
+                                          _after.wrapperLens %~ replaceWrapper
+      replaceWrapper (IndexedStackType _  Nothing) = error "index of wildcardwrapper is always a just!"
+      replaceWrapper (IndexedStackType t  (Just i)) =
         let id = lookup i replacements
             id' = case id of
                 Nothing -> error "replacement error"
                 Just id'' -> id''
         in
-            (setBaseType (UnknownType id') t, Just i)
+            (IndexedStackType (setBaseType (UnknownType id') t) (Just i))
 
   return $ map changeWrappersToUnknown result
                                   
@@ -195,7 +196,7 @@ getEffOfMethod clazz method = do
 
 flag'' = do
   id <- _identifier <<+= 1
-  return $ (NoReference $ PrimType FT.flag, Just id)
+  return $ IndexedStackType (NoReference $ PrimType FT.flag) (Just id)
 
 showEffects = unlines . map (render . P.stackEffectNice . fst)
 

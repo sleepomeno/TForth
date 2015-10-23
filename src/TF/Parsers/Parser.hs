@@ -144,9 +144,9 @@ prepareUnresolvedArgsTypes (sem, forced) = do
       arg -> return arg
             
     indexedStackType' :: IndexedStackType -> UnresolvedArgsM IndexedStackType
-    indexedStackType' (arg@(NoReference (ExecutionType (ExecutionToken _ (Just (UnknownR index))))), i) = do
+    indexedStackType' (IndexedStackType arg@(NoReference (ExecutionType (ExecutionToken _ (Just (UnknownR index))))) i) = do
       newIndex <- getIndex index
-      return (arg & _NoReference._ExecutionType._exectokenRuntimeSpecified._Just._UnknownR .~ newIndex, i)
+      return $ IndexedStackType (arg & _NoReference._ExecutionType._exectokenRuntimeSpecified._Just._UnknownR .~ newIndex) i
     indexedStackType' x = return x
 
     getIndex index = do 
