@@ -90,10 +90,8 @@ data ColonDefinitionProcessed = ColonDefinitionProcessed {
 data Definition = ColDef ColonDefinitionProcessed | CreateDef [StackEffect] deriving Show
 
 type CompExecEffect = (StackEffect, StackEffect)
-type StackEffectPair = (StackEffect, StackEffect)
 
 
-newtype ForthEffect = ForthEffect ([StackEffectPair], Intersections) deriving (Show, Eq)
   
 
 -- data FullStackEffect = FullStackEffect {
@@ -246,7 +244,6 @@ makeFields ''ColonDefinition
 makeFields ''ParseConfig
 makeFields ''CheckEffectsConfig
 makeFields ''ColonDefinitionProcessed
-makeWrapped ''ForthEffect
 makeLenses ''BuildState
 makeLens ''ParseEffectResult
 makeFields ''ParseState

@@ -66,13 +66,13 @@ instance HasStackEffects Expr where
           maybeDoes <- runMaybeT $ do
             exprs' <- hoistMaybe does
             forthEff <- lift $ withEmpty $ checkNodes exprs'
-            return $ forthEff ^. _Wrapped._1
+            return $ forthEff 
 
           result' <- case maybeDoes of
                         Nothing -> return result
                         Just doesEffects -> do
-                          -- let newCreating = create & (elementOf (_ForthWord.l.traverse.streamArgs.traverse._Defining) 0).runtimeEffect ?~ _RuntimeNotProcessed # (doesEffects & traverse.both %~ (\(StackEffect x y z) -> (x,y,z)))
                           let newCreating = create & elementOf (_ForthWord.l.traverse._streamArgs.traverse._Defining) 0._runtimeEffect ?~ doesEffects
+                          -- TODO make sure compiletime before and after are empty
                           go (newCreating, exprs, comma, Nothing)
 
 

@@ -17,6 +17,26 @@ data IndexedStackType = IndexedStackType {
 type Identifier = Int
 type ClassName = String
 
+newtype Intersection = Intersection Bool deriving (Eq,Show,Ord)
+type DataStackEffect = [StackEffect]
+
+data MultiStackEffect = MultiStackEffect {
+  _steffsMultiEffects :: DataStackEffect
+  } deriving (Show, Eq)
+
+data StackEffectsWI = StackEffectsWI {
+    stefwiMultiEffects :: MultiStackEffect
+  , stefwiIntersection :: Intersection } deriving (Show,Eq)
+
+type StackEffectPair = (StackEffect, StackEffect)
+data StackEffectPairsWI = StackEffectWI {
+    stefwiStackEffectPairs :: [StackEffectPair]
+  , stefwiIntersect :: Intersections } deriving (Show,Eq,Ord)
+
+data Intersections = Intersections {
+    compileEffect :: Bool
+  , execEffect :: Bool
+  } deriving (Show,Eq,Ord)
 
 data DataArgOrStreamArg dataArg = DataArg dataArg | NonDataArg DefiningOrNot deriving (Show, Eq)
 
@@ -63,10 +83,12 @@ data ArgInfo a = ArgInfo {
   
 
                         
+newtype ForthEffect = ForthEffect ([StackEffectPair], Intersections) deriving (Show, Eq,Ord)
 data DefiningArg = DefiningArg {
                       definingArgInfo :: ArgInfo StackEffect
                     , argType :: Maybe IndexedStackType
-                    , runtimeEffect :: Maybe [(StackEffect,StackEffect)]
+                    -- , runtimeEffect :: Maybe [(StackEffect,StackEffect)]
+                    , runtimeEffect :: Maybe ForthEffect
                     }  deriving (Show,Eq,Ord)
 
 data StreamArg = StreamArg {
@@ -80,11 +102,6 @@ data StackEffect = StackEffect {
                  }  deriving (Show, Eq,Ord)
 makeLens ''StackEffect
 
-type DataStackEffect = [StackEffect]
-
-data MultiStackEffect = MultiStackEffect {
-  _steffsMultiEffects :: DataStackEffect
-  } deriving (Show, Eq)
 
 makeTraversals ''DataType
 makeTraversals ''BasicType
@@ -95,3 +112,10 @@ makeTraversals ''RuntimeSpecification
 makeTraversals ''DefiningOrNot
 makeLens ''ExecutionToken
 makeLens ''IndexedStackType
+
+makeWrapped ''MultiStackEffect
+makeLens ''StackEffectsWI
+makeLens ''StackEffectPairsWI
+makeWrapped ''Intersection
+makeLens ''Intersections
+makeWrapped ''ForthEffect

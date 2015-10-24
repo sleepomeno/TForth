@@ -303,7 +303,7 @@ create = do
       bla `shouldHave` _head._after._head._stackType._NoReference._PrimType._primtypeSymbol.only FT.N
 
       let foo = getColonDefEffects "foo" prog
-      foo `shouldHave` _head._streamArgs._head._Defining._runtimeEffect._Just._head._1._after._head._stackType._NoReference._PrimType._primtypeSymbol.only N
+      foo `shouldHave` _head._streamArgs._head._Defining._runtimeEffect._Just._Wrapped._1._head._1._after._head._stackType._NoReference._PrimType._primtypeSymbol.only N
     it "where the type is constrained by a later comma" $ do
       let prog = ": foo create does> @ + ; : bla foo 4 , ; bla bar"
           bar = getCreateDefEffects "bar" prog

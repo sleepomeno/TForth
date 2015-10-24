@@ -42,16 +42,6 @@ data Semantics = Semantics {
                    , semEffectsOfStack:: StackEffectsWI
                       } deriving (Show, Eq)
              
-newtype Intersection = Intersection Bool deriving (Eq,Show)
-
-data StackEffectsWI = StackEffectsWI {
-    stefwiMultiEffects :: MultiStackEffect
-  , stefwiIntersection :: Intersection } deriving (Show,Eq)
-
-data Intersections = Intersections {
-    compileEffect :: Bool
-  , execEffect :: Bool
-  } deriving (Show,Eq)
 
 data ParsedWord = ParsedWord {
                    parsedPW :: Parsable
@@ -120,7 +110,6 @@ data OOPExpr = Class ClassName [(Variable, OOFieldSem)] [(Method, OOMethodSem)] 
                                                      
 
 
-makeWrapped ''MultiStackEffect
 makeLens ''ParsedWord
 makeWrapped ''Unknown
 makeLens ''Semantics
@@ -133,6 +122,3 @@ makeTraversals ''OOFieldSem'
 makeTraversals ''Parsable
 makeTraversals ''CompiledOrExecuted
 
-makeLens ''StackEffectsWI
-makeWrapped ''Intersection
-makeLens ''Intersections

@@ -262,9 +262,12 @@ handleArgs (Defining arg) = do
     uniqueId3 <- _identifier <<+= 1
     -- let maybeRuntimeType = _Just.chosen.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe (Either [(StackEffect,StackEffect)] [(StackEffect,StackEffect)])
     -- let maybeRuntimeType = _Just.traverse.both %~ toStackEffect $ view runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
-    let maybeRuntimeType = view _runtimeEffect arg :: Maybe [(StackEffect,StackEffect)]
-        initialRuntimeType = StackEffect [] [] [over _stackType Reference $ fromMaybe (IndexedStackType Wildcard  (Just 0)) currentType]
+    let maybeRuntimeType = view _runtimeEffect arg :: Maybe ForthEffect -- [(StackEffect,StackEffect)]
+
+        -- initialRuntimeType = StackEffect [] [] [over _stackType Reference $ fromMaybe (IndexedStackType Wildcard  (Just 0)) currentType]
+
         defaultRuntimeType = StackEffect [] [] [defaultR & _stackType %~ Reference]
+
         defaultR = case currentType of
           Nothing -> IndexedStackType (UnknownType uniqueId) (Just uniqueId2)
           Just (IndexedStackType t  i) -> if baseType t == Wildcard then
@@ -273,20 +276,16 @@ handleArgs (Defining arg) = do
                            (IndexedStackType t i)
           -- Just x -> x
         defaultRuntimeType' = StackEffect [] [] [defaultR' & _stackType %~ Reference]
+
         defaultR' = case currentType of
           -- Nothing -> (UnknownType uniqueId, Just uniqueId2)
           Nothing -> IndexedStackType WildcardWrapper ( Just uniqueId3)
           Just x -> x
 
     (runtimeType) <- if isJust maybeRuntimeType then
-                     -- if isJust (view resolved arg) then
-                               -- TODO remove _runtimeprocessed 
-                                -- if (has (_Just._RuntimeProcessed) maybeRuntimeType) then
-                                -- -- if (view runtimeChecked arg) then
-                                --   undefined >>
-                                --   return ((toListOf (_Just.chosen.traverse._1) maybeRuntimeType), True)
                                 (withEmpty $ do
 
+                                  -- undefined
                                   iop $ "defaulruntime is"
                                   iop $ show defaultRuntimeType
                                   modifyState $ _effects._Wrapped._1.traverse._1 .~ defaultRuntimeType'
@@ -295,7 +294,10 @@ handleArgs (Defining arg) = do
                                   -- effs <- view realEffects <$> getState
                                   -- liftIO . mapM (putStrLn . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e)) $ effs
                                   -- iopC "SSSSSSSSSSSSSSS"
-                                  let runtimeEffects' = withoutIntersect $ (maybeRuntimeType ^?! _Just)
+                                  -- let runtimeEffects'' = withoutIntersect (maybeRuntimeType ^?! _Just) :: ForthEffect
+                                  let runtimeEffects'' = maybeRuntimeType ^?! _Just
+                                      runtimeEffects' = runtimeEffects'' -- & _Wrapped._1.traverse.both._before %~ reverse & _Wrapped._1.traverse.both._after %~ reverse
+                                  -- TODO add intersect to runtimeType of definingargument
 
                                   -- iopC "runtime effects"
                                   -- liftIO . mapM (putStrLn . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e)) $ runtimeEffects'

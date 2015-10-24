@@ -72,6 +72,11 @@ applyRule3 (stE1, stE2) = do
     typesMatch <- lift $ lift $ lift $ topOfStack `isSubtypeOf` topOfArgs
     assert (not typesMatch)
     -- Rule 3 is applicable if the top of stack of both effects match
+    iop $ "CLASH: "
+    iop $ "topOfStack"
+    iop $ show topOfStack
+    iop $ "topOfArgs"
+    iop $ show topOfArgs
     typeClash
 
 
