@@ -107,7 +107,7 @@ evalKnownWord w'@(Word _ nameW runtime execution compSem intSem _ intersect) = d
           guard rFS
           args' <- args
           resolvedArgs <- lift (resolveStreamArgs args' []) :: MaybeT (ParsecT [Token] ParseState StackEffectM) [DefiningOrNot]
-          let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
+          let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
           return $ kw & _stacksEffects._ExecutedEff._Wrapped.traverse %~ ((_streamArgs .~ resolvedArgs) . (_before.traverse %~ resolveRuntimeType resolvedRuntimes) . (_after.traverse %~ resolveRuntimeType resolvedRuntimes))
 
   kw' <- runMaybeT resolveArgs
@@ -159,7 +159,7 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
 
   newEffects <- if executed then do
               resolvedArgs <- resolveStreamArgs args []
-              let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
+              let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
               -- return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse.filtered (\(t, _) -> has (_NoReference._ExecutionType.runtimeSpecified._Just._UnknownR) (baseType' t))) %~ (resolveRuntimeType resolvedRuntimes)
               return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse._after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
 
@@ -220,7 +220,7 @@ evalUnknown uk =  do
   fmap fromJust . runMaybeT $ msum [evalDefinedWord uk, evalCreatedWord uk, return (evalNonDefinition uk, view _stateVar s)]
 
 handleHOTstreamArgument :: DefiningOrNot -> Token -> CheckerM DefiningOrNot
-handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) token = do 
+handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ ) (Just (UnknownR index)))) token = do 
   (forthWord, _) <- sealed $ local (readFromStream .~ False) $ evalToken token
   -- iop "handleHOT"
   -- iop $ show forthWord
@@ -256,15 +256,15 @@ handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (Unknow
         Just eff'' -> do
           isSubtype <- eff `effectIsSubtypeOf` eff''
           unless isSubtype $ lift $ throwing _HOTNotSubtype ()
-          return $ arg & _NotDefining._streamArgInfo._runtimeSpecified ?~ ResolvedR index eff''
+          return $ arg & _NotDefining._runtimeSpecified ?~ ResolvedR index eff''
         Nothing    -> do
           let newState = s & (_unresolvedArgsTypes.at index) ?~ eff
           putState newState
           -- TODO why not done?
-          return $ arg & _NotDefining._streamArgInfo._runtimeSpecified ?~ ResolvedR index eff
+          return $ arg & _NotDefining._runtimeSpecified ?~ ResolvedR index eff
   
 
-handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (KnownR effs))))) possWord = do 
+handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ )(Just (KnownR effs)))) possWord = do 
   return arg
 
 handleHOTstreamArgument arg _ = return arg

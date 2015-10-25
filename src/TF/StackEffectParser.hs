@@ -69,13 +69,13 @@ parseInputStreamArgument = do
             result <- parseCreateType
             string "]"
             return result
-          return $ Defining (DefiningArg (ArgInfo n' Nothing endDelimiter Nothing) createType Nothing) :: ParseStackEffectsM DefiningOrNot
+          return $ Defining (DefiningArg (ArgInfo n' Nothing endDelimiter) createType Nothing) :: ParseStackEffectsM DefiningOrNot
 
     let notDefiningArg = do 
           string streamMarker 
           (n',endDelimiter) <- parseArg
           runtimeEff <- parseRuntimeType
-          return $ NotDefining $ StreamArg (ArgInfo n' Nothing endDelimiter runtimeEff)
+          return $ NotDefining $ StreamArg (ArgInfo n' Nothing endDelimiter) runtimeEff
 
     result <- try definingArg <|> notDefiningArg
     atLeastOneSpace

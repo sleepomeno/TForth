@@ -119,8 +119,18 @@ stackEffectWithoutArgs(StackEffect b streamArgs a) = text "Effect" $+$
                                    nested (text "After") $+$
                                       nest 2 (indexedArgs a)
 
+forthEffect :: ForthEffect -> Doc
+forthEffect (ForthEffect (pairs, intersection)) = vcat (map steffPair pairs) $+$ ppDoc intersection 
+  where
+    steffPair (eff1, eff2) = text "Compile-time" $+$ nested (stackEffect eff1) $+$ text "Execution-time" $+$ nested (stackEffect eff2)
+
 definingOrNot :: DefiningOrNot -> Doc
-definingOrNot = ppDoc
+-- definingOrNot = ppDoc
+definingOrNot arg@(NotDefining _) = ppDoc arg
+definingOrNot (Defining (DefiningArg (ArgInfo name resolved endDelimiter) type' runtimeEffect)) = text ("Defining Arg: " <> name) $+$ nested (text "Resolved: " $+$ (nested $ ppDoc resolved) $+$ (text "End-Delimiter" $+$ (nested $ ppDoc endDelimiter)) $+$ (text "Value type" $+$ nested (case type' of { Nothing -> text "Nothing"; Just x -> indexedArgs [x]  })) $+$ text "RuntimeEffect" $+$ nested (case runtimeEffect of {Nothing -> text "Nothing"; Just x -> forthEffect x}))
+
+
+                
 definingOrNotNice :: DefiningOrNot -> Doc
 definingOrNotNice (Defining arg) = text $ ":'" <> arg ^. _definingArgInfo._argName <> "'"
 definingOrNotNice (NotDefining arg) = text $ "'" <> arg ^. _streamArgInfo._argName <> "'"

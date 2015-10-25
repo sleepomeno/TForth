@@ -138,9 +138,9 @@ prepareUnresolvedArgsTypes (sem, forced) = do
 
     definingOrNot :: DefiningOrNot -> UnresolvedArgsM DefiningOrNot
     definingOrNot = \case
-      arg@(NotDefining (StreamArg (ArgInfo _ _ _ (Just (UnknownR index))))) -> do
+      arg@(NotDefining (StreamArg (ArgInfo _ _ _ )(Just (UnknownR index)))) -> do
         newIndex <- getIndex index
-        return $ arg & _NotDefining._streamArgInfo._runtimeSpecified._Just._UnknownR .~ newIndex
+        return $ arg & _NotDefining._runtimeSpecified._Just._UnknownR .~ newIndex
       arg -> return arg
             
     indexedStackType' :: IndexedStackType -> UnresolvedArgsM IndexedStackType

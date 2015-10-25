@@ -130,17 +130,17 @@ instance HasStackEffects Expr where
     let effect = effects ^?! _head
     when (has (_before._head) effect) $ throwing (_ErrorTick . _MalformedAssert) "No before allowed!"
     when (has (_after._head) effect) $ throwing (_ErrorTick . _MalformedAssert) "No After allowed!"
-    let args = toListOf (_streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._KnownR) effect
+    let args = toListOf (_streamArgs.traverse._NotDefining._runtimeSpecified._Just._KnownR) effect
     unless (1 == length args) $ throwing (_ErrorTick . _MalformedAssert) "Exactly one knownR stream argument necessary!"
 
     let runtimeEff'' = args ^?! _head -- .stackEffectIso
 
-    let pw' = pw & _stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just %~ setEffect
+    let pw' = pw & _stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._runtimeSpecified._Just %~ setEffect
         setEffect :: RuntimeSpecification -> RuntimeSpecification
         setEffect = \case
           UnknownR i -> ResolvedR i runtimeEff''-- (effect ^. from stackEffectIso)
           x          -> x
-    let resolvedRuntimes = pw' ^.. _stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
+    let resolvedRuntimes = pw' ^.. _stacksEffects._CompiledEff._Wrapped.traverse._streamArgs.traverse._NotDefining._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
         pw'' = pw' & _stacksEffects._CompiledEff._Wrapped.traverse %~ ((_before.traverse %~ resolveRuntimeType resolvedRuntimes) . (_after.traverse %~ resolveRuntimeType resolvedRuntimes))
 
     getStackEffects (KnownWord pw'')
@@ -183,10 +183,10 @@ instance HasStackEffects Expr where
 
     when (has (chosen'.traverse._before._head) effs) $ throwing _MalformedAssert "No before arguments allowed"
     when (has (chosen'.traverse._streamArgs.traverse._Defining) effs) $ throwing _MalformedAssert "No defining arguments allowed!"
-    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Nothing) effs) $ throwing _MalformedAssert "Runtime Specification is Nothing!"
-    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._UnknownR) effs) $ throwing _MalformedAssert "Runtime Specification is UnknownR!"
-    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._NoR) effs) $ throwing _MalformedAssert "Runtime Specification is NoR!"
-    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._streamArgInfo._runtimeSpecified._Just._ResolvedR) effs) $ throwing _MalformedAssert "Runtime Specification is ResolvedR!"
+    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._runtimeSpecified._Nothing) effs) $ throwing _MalformedAssert "Runtime Specification is Nothing!"
+    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._runtimeSpecified._Just._UnknownR) effs) $ throwing _MalformedAssert "Runtime Specification is UnknownR!"
+    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._runtimeSpecified._Just._NoR) effs) $ throwing _MalformedAssert "Runtime Specification is NoR!"
+    when (has (chosen'.traverse._streamArgs.traverse._NotDefining._runtimeSpecified._Just._ResolvedR) effs) $ throwing _MalformedAssert "Runtime Specification is ResolvedR!"
 
     return $ withoutIntersect $ effsAsTuples $ effs' ^. from compOrExecIso
 

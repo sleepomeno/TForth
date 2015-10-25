@@ -79,7 +79,7 @@ data ArgInfo a = ArgInfo {
                       argName :: String
                     , resolved :: Maybe String
                     , endDelimiter :: Maybe String
-                    , runtimeSpecified :: Maybe a } deriving (Show,Eq,Ord)
+                    } deriving (Show,Eq,Ord)
   
 
                         
@@ -93,6 +93,7 @@ data DefiningArg = DefiningArg {
 
 data StreamArg = StreamArg {
                       streamArgInfo :: ArgInfo RuntimeSpecification
+                    , runtimeSpecified :: Maybe RuntimeSpecification
                         
                     } deriving (Show,Eq,Ord)
 data StackEffect = StackEffect {
