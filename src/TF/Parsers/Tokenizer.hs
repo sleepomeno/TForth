@@ -9,12 +9,10 @@ import           TF.WordsBuilder (buildWord')
 import Control.Monad.Except
 import           Control.Monad.Error.Lens
 import           Control.Monad.Free
--- import           Control.Monad.Trans.Free
 import           Data.Char hiding (Control)
 import qualified Data.Map as M
-import           TF.Types hiding (state, isSubtypeOf)
+import           TF.Types hiding (state)
 import qualified TF.Words as W
-import  TF.Util
 import qualified Data.Text as Te
 import           Text.Parsec hiding (runParser, anyToken)
 import TF.Errors
@@ -35,8 +33,7 @@ parseLineComment = do
   manyTill anyChar (try newline)
   return ()
 
-parseNextToken = do
-  (liftM (const Nothing) $ try parseLineComment) <|> (liftM Just parseNextWord)
+parseNextToken = (liftM (const Nothing) $ try parseLineComment) <|> (liftM Just parseNextWord)
 
 parseNextWord :: ParsecT String () Script' Token
 parseNextWord = do

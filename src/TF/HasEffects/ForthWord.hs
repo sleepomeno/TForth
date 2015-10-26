@@ -13,19 +13,12 @@ import TF.Type.Nodes
 
 instance HasStackEffects ForthWord where
   getStackEffects (KnownWord pw)  = do
-    -- pw ^. stacksEffects & adjustEffectsState
     let compExecEffect :: [StackEffectPair]
         compExecEffect = pw ^. _stacksEffects.to fromThree'
-    -- return $ zipWith3 StackEffect (beforeArgs dataStack pw) (repeat (streamArgsOfParsedWord pw)) (afterArgs dataStack pw)
     return $ withIntersect (pw ^. _intersectionsPW) compExecEffect
 
 
   getStackEffects (DefE x) = do
-    -- let stEffs :: CompiledOrExecuted [StackEffect]
-    --     stEffs = view (_2._stefwiMultiEffects._Wrapped) <$> x
-    --     intersect = view (_2._stefwiIntersection) <$> x
-    --     effs :: [StackEffectPair]
-    --     effs = effsAsTuples stEffs
     let stEffsComp = x ^.. _Compiled._2._stefwiMultiEffects._Wrapped.traverse
         stEffsExec :: [StackEffect]
         stEffsExec = x ^.. _Executed._2._stefwiMultiEffects._Wrapped.traverse
@@ -36,15 +29,7 @@ instance HasStackEffects ForthWord where
         intersectExec = getAny $ x ^. _Executed._2._stefwiIntersection._Wrapped._Unwrapped
     return $ withIntersect (Intersections intersectComp intersectExec) effects
 
-    -- return $ withIntersect intersect effs
-
   getStackEffects (UnknownE uk) = do
     let unknownName = uk ^. _Wrapped
 
-
-    -- s <- getState
-    -- iop $ showCheckerState s
-    -- iop " AAAAAA"
-    
     throwing _UnknownWord $ "Word " <> unknownName <> " is unknown!"
-    -- unexpected $ "Word " ++ unknownName ++ " is unknown!"

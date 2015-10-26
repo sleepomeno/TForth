@@ -37,12 +37,6 @@ renameWildcards = applyWildcardRule renameWildcards'
         let wildcardsStE1 = getWildcards stE1 :: [IndexedStackType]
             wildcardsStE2 = getWildcards stE2 :: [IndexedStackType]
 
-        iop "wildcardste1"
-        iop $ show wildcardsStE1
-
-        iop "wildcardste2"
-        iop $ show wildcardsStE2
-
             -- maxIndex = maximum . map snd $ wildcardsStE1 ++ wildcardsStE2
         let maxIndex = maximum . (0:) . toListOf (traverse._typeIndex._Just) $ wildcardsStE1 ++ wildcardsStE2
             wildcardIndicesMatch x y = guard (x ^. _typeIndex == y ^. _typeIndex) >> Just x
@@ -50,10 +44,6 @@ renameWildcards = applyWildcardRule renameWildcards'
         let wildcardMatches :: [Maybe IndexedStackType]
             wildcardMatches = map (uncurry wildcardIndicesMatch) $ liftM2 (,) wildcardsStE1 wildcardsStE2 
 
-        -- iop "wildcardmatches"
-        -- iop $ show wildcardMatches
-
-        -- sameWildcard <- hoistEither $ note (stE1, stE2)  (preview (traverse._Just) wildcardMatches )
         sameWildcard <-  preview (traverse._Just) wildcardMatches & orReturnEffects 
 
         logApplication "renameWildcards"
@@ -304,8 +294,7 @@ isCorrectCreatedWord identifier (w, _)  = has _UnknownType (baseType w)  && ((ba
   
 
 resolveUnknown :: Identifier -> IndexedStackType -> WildcardRuleM ()
-resolveUnknown identifier (IndexedStackType arg _) = blocked $ do
-  iopW $ "RRRRRRRRRRRRRR"
+resolveUnknown identifier (IndexedStackType arg _) = blocked iopW $ do
   lift . lift $ tell [(ResolveUnknown identifier arg)] 
 
 updateFields :: (StackEffect -> StackEffect) -> ClassName -> [(Variable, OOFieldSem)] -> [(Variable, OOFieldSem)]
@@ -350,12 +339,12 @@ type WildcardRuleM' = ReaderT (StackEffects, Return IndexedStackType ) Continuat
 storedEffects = _1
 exitContinuation = _2
 
-logApplication rule = blocked $ do
+logApplication rule = blocked iopW $ do
   iopW $ "APPLY " ++ rule 
 
 showType = render . P.dataType
 
-logTopTypes topOfStackIndexed topOfArgsIndexed rule = blocked $ do 
+logTopTypes topOfStackIndexed topOfArgsIndexed rule = blocked iopW $ do 
   iopW $ "APPLY " ++ rule
   iopW $ "Top of stack: " ++ showType topOfStackIndexed
   iopW $ "Top of args : " ++ showType topOfArgsIndexed

@@ -51,16 +51,12 @@ parseNoName = do
 
       typeCheckingFails :: String -> ExpressionsM (Either [Node] [Node])
       typeCheckingFails reason =  do
-        iopP "typecheckingfails"
         env <- ask
         lift $ local (typeCheck .~ False) $ (`runReaderT` env) parseNonameBody
         lift $ modifyState $ set _stateVar INTERPRETSTATE
         return $ Left []
 
   expr <- catches parseNonameBody (errorHandler typeCheckingFails ":Noname implementation")
-  iopP "after parsenonamebody"
-  -- inp <- getInput
-  -- liftIO . mapM (putStrLn. show) $ inp
   (clazz, method) <- parseDefines
 
   return $ OOPExpr $ either (const $ NoNameClash sem clazz method)
@@ -77,7 +73,6 @@ parseVariable = do
   field <- parseUnknownName
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   sem <- lift $ optionMaybe $ parseStackEffectSemantics parseFieldType
-  -- iop $ show sem
   return (field, sem & fmap fst & _Just %~ (fromJust . preview (_semEffectsOfStack._stefwiMultiEffects._Wrapped._head)))
 
 parseMethod :: ExpressionsM (String, Maybe ([StackEffect], Bool))

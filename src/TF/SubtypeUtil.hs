@@ -1,4 +1,9 @@
-module TF.SubtypeUtil where
+module TF.SubtypeUtil (
+    isSubtypeOf
+  , getCommonSupertype''
+  , constraints
+  , effectIsSubtypeOf
+    ) where
 
 import           Control.Arrow
 import           Control.Error            as E
@@ -38,17 +43,6 @@ isSubtypeOf t1 t2 = do
 
     return $ subtypeOfXT || inSubtypeRelation || subtypeOfWildcard
   else return False 
-
-getCommonSupertype effs1 effs2 = do
-  guard1 <- allM (\(x1, x2) -> anyM (\(y1, y2) -> do
-    res1 <- y1 `effectIsSubtypeOf` x1
-    res2 <- y2 `effectIsSubtypeOf` x2
-    return res1) effs1) effs2
-  guard2 <- allM (\(x1, x2) -> anyM (\(y1, y2) -> do
-    res1 <- y1 `effectIsSubtypeOf` x1
-    res2 <- y2 `effectIsSubtypeOf` x2
-    return $ res1) effs2) effs1
-  return $ msum [(guard guard1) >> Just effs1, (guard guard2) >> Just effs2]
 
 getCommonSupertype' effs1 effs2 = do
   guard1 <- allM (\x1 -> anyM (\y1 -> do
@@ -95,29 +89,27 @@ effectIsSubtypeOf eff1 eff2 =  (`runContT` id) $ callCC $ \exit -> do
                                                 (has (_Defining._argType._Nothing) arg1 && has (_Defining._argType._Nothing) arg2)) $ zip streamArgs1 streamArgs2 :: Bool
 
 
-  -- iop "before argskind"
-  when (not $ sameLengths && streamArgsSameKind) $ exit (return False)
-  -- iop "after argskind"
+  unless (sameLengths && streamArgsSameKind) $ exit (return False)
 
   forM_ (zip before1 before2) $ \((IndexedStackType t1 _),(IndexedStackType t2 _)) -> do
     isContravariant <- lift $ t2 `isSubtypeOf` t1
-    iop $ "iscontravariant: " ++ show isContravariant
+    iopSu $ "iscontravariant: " ++ show isContravariant
     when (not isContravariant) $ exit (return False)
-  iop "FUUUU"
+  iopSu "FUUUU"
 
   forM_ (zip after1 after2) $ \((IndexedStackType t1  _),(IndexedStackType t2 _)) -> do
     isCovariant <- lift $ t1 `isSubtypeOf` t2
-    iop $ "covariant: " <> (show isCovariant)
-    iop $ (show t1)
-    iop $ (show t2)
+    iopSu $ "covariant: " <> (show isCovariant)
+    iopSu $ (show t1)
+    iopSu $ (show t2)
     when (not isCovariant) $ exit (return False)
-  iop "aftercovariant"
+  iopSu "aftercovariant"
 
   -- when (constraints eff1 /= constraints eff2) $ exit (return False)
-  iop $ "constraints eff1"
-  mapM (iop . show) (constraints eff1)
-  iop $ "constraints eff2"
-  mapM (iop . show) (constraints eff2)
+  iopSu $ "constraints eff1"
+  mapM_ (iopSu . show) (constraints eff1)
+  iopSu $ "constraints eff2"
+  mapM_ (iopSu . show) (constraints eff2)
   unless (all (`elem` constraints eff1) $ constraints eff2) $ exit (return False)
 
   return $ return True

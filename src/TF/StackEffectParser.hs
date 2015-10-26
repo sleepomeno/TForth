@@ -219,11 +219,11 @@ testEffect t = do
 parseFieldType t config = parseEffectTemplate t config parseFieldType'
 
 parseCast' t config = do
-  iop "parseCast"
+  iopP "parseCast"
   parseEffectTemplate t config parseCast''
                           
 parseAssertion' t config = do
-  iop "parseassertion'"
+  iopP "parseassertion'"
   parseEffectTemplate t config parseAssertion''
 
 parseCreateType :: ParseStackEffectsM IndexedStackType
@@ -262,7 +262,7 @@ parseAssertion'' = void $ do
 
   results <- parseStackImage `sepBy1` P.char '/' 
 
-  traceM $ "Length: " ++ show (length results)
+  iopP $ "Length: " ++ show (length results)
 
   let assertions = for results $ \t -> def & _parsestateBefore .~ [[]] & _parsestateAfter .~ [t] & _parsestateStreamArguments .~ [[]]
 
@@ -289,7 +289,6 @@ parseFieldType' = void $ do
   string ")"
                            
 parseEffectTemplate t conf p = do
-  -- iop "parseeffectemplate"
 
   allowDynamic <- view allowDynamicInStackComments
   initialState <- if allowDynamic then
@@ -299,11 +298,9 @@ parseEffectTemplate t conf p = do
   let parseResult = flip runReader conf $ (runParserT (p >> getState) initialState "" t)
   case parseResult of
     Left e -> do
-      -- iop "parseeffectemplate wrong"
-      iopS e
+      iopP . show $ e
       throwing _ParseErr'  . show $ e
     Right st -> do
-        -- iop "parseeffectemplate right"
         let streamArgsLists = view (traverse._parsestateStreamArguments) allEffects
             sameStreamArgs = length (group streamArgsLists) <= 1
         when (not sameStreamArgs) $

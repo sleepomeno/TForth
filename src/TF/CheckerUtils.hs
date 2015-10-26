@@ -200,21 +200,3 @@ flag'' = do
 
 showEffects = unlines . map (render . P.stackEffectNice . fst)
 
-showClasses :: ParseState -> String
-showClasses st = 
-  let classesToMethods = views _classInterfaces M.toList st 
-      classesToFields  = views _classFields M.toList st
-      in
-   render . vcat $ map (\((clazz, methods),(_,fields)) -> P.showClass clazz "unknown" fields methods) $ filter (\((class1, _), (class2, _)) -> class1 == class2) $ liftM2 (,) classesToMethods classesToFields
-
-showCheckerState :: ParseState -> String
-showCheckerState st = unlines [showDefinitions st, showClasses st]
-showDefinitions :: ParseState -> String
-showDefinitions st =
-  let showColonDefinition name colonDef = render $ text name $+$ P.nested (P.colonDefinition' colonDef)
-      showCreate name effs = render $ text name $+$ P.nested (vcat $ map P.stackEffectNice effs)
-      keysValues = M.toList $ view _definedWords' st :: [(String, Definition)]
-      in
-  "DICTIONARY:\n\n" ++ (unlines . map (++ "\n") . map (\(name,y) -> case y of 
-                                      ColDef x -> showColonDefinition name x
-                                      CreateDef x -> showCreate name x) $ keysValues)

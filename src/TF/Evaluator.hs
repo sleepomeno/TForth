@@ -41,8 +41,6 @@ evalToken :: Token -> CheckerM (ForthWord, SemState)
 evalToken (UnknownToken x) =  evalUnknown x
 evalToken (WordToken x ) = evalKnownWord x
   
--- evalForthWord                   = evalForthWordWithout []
-
 -- |Parses a Token - when it's a unknown check if there is a definition. If the definition is immediate, we are in compile-mode and it contains postpones we need to prepend the body of the definition to the current stream
 evalForthWordWithout       :: [Word]     -> CheckerM ForthWord
 evalForthWordWithout ws         = do
@@ -78,8 +76,6 @@ evalKnownWord w'@(Word _ nameW runtime execution compSem intSem _ intersect) = d
 
   let reverseStacks' = reverseArgs
                         
-      -- _semToArgs = _semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse
-      -- reverseArgs = foldr (.) id (map (\l -> l %~ reverse) [_semToArgs._before, _semToArgs._after, _semToArgs._streamArgs])
       reverseStacks sem' = (`fmap` sem') reverseArgs
                                            
       _semToArgs = _semEffectsOfStack._stefwiMultiEffects._Wrapped.traverse
@@ -119,8 +115,7 @@ evalKnownWord w'@(Word _ nameW runtime execution compSem intSem _ intersect) = d
   
 
 maybeColonDefinition :: Unknown -> ParseState -> Maybe ColonDefinitionProcessed
-maybeColonDefinition w' s   = preview (_definedWords'.at (w' ^. _Wrapped)._Just._ColDef) s-- & fmap (view _ColDef)
--- maybeDefinition w' s   = view (_definedWords'.at (w' ^. name)) s
+maybeColonDefinition w' s   = preview (_definedWords'.at (w' ^. _Wrapped)._Just._ColDef) s
 evalNonDefinition  =  UnknownE . Unknown . view _Wrapped
 
 evalColonDefinition :: ColonDefinitionProcessed -> CheckerM ForthWord
@@ -131,12 +126,6 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
   let st = view _stateVar s
       executed = st == INTERPRETSTATE || isCdefImmediate
       
-      -- executed = st == INTERPRETSTATE || colonDef ^. meta.isImmediate
-      -- colonName = colonDef ^. name
-
-  iopP $ "SHOW COLONNAME " ++ colonName
-  iopP $ "IS EXECUTED: " ++ show executed
-
   typeCheckingEnabled <- view typeCheck
 
   when typeCheckingEnabled $ void $ runExceptT $ do
@@ -148,8 +137,6 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
   stEff <- liftUp $ tryHead (_Impossible # (colonName ++ " has no effects! Empty List!")) effs
 
   let intersect = getAny $ effs' ^. (_forcedOrChecked._stefwiIntersection._Wrapped._Unwrapped)
-  -- intersect <- liftUp $ maybeIntersect ?? (_ClashInWord # colonName)
-  -- intersect <- liftUp $ maybeIntersect ?? (_ClashInWord # colonName)
 
   let args = stEff ^. _streamArgs
       compiledOrExecuted = if executed  then
@@ -160,7 +147,6 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
   newEffects <- if executed then do
               resolvedArgs <- resolveStreamArgs args []
               let resolvedRuntimes = resolvedArgs ^.. traverse._NotDefining._runtimeSpecified._Just._ResolvedR :: [(UniqueArg, StackEffect)]
-              -- return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse.filtered (\(t, _) -> has (_NoReference._ExecutionType.runtimeSpecified._Just._UnknownR) (baseType' t))) %~ (resolveRuntimeType resolvedRuntimes)
               return $ effs & (traverse._streamArgs .~ resolvedArgs ) & (traverse._before.traverse) %~ (resolveRuntimeType resolvedRuntimes) & (traverse._after.traverse) %~ (resolveRuntimeType resolvedRuntimes)
 
            else
@@ -173,11 +159,9 @@ evalColonDefinition (ColonDefinitionProcessed colonDef effs')  = do
 evalCreatedWord :: Unknown -> MaybeT CheckerM (ForthWord, SemState)
 evalCreatedWord (Unknown ukName) = do
   parseState <- lift getState
-  -- let maybeEffects = view (colonDefEffects.at ukName) parseState
   let maybeEffects :: Maybe [StackEffect]
       maybeEffects = preview (_definedWords'.at ukName._Just._CreateDef) parseState 
   effs <- hoistMaybe maybeEffects
-  -- iop $ "ukname is '" ++ ukName ++ "'!"
   let st = view _stateVar parseState
       executed = st == INTERPRETSTATE 
 
@@ -222,15 +206,10 @@ evalUnknown uk =  do
 handleHOTstreamArgument :: DefiningOrNot -> Token -> CheckerM DefiningOrNot
 handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ ) (Just (UnknownR index)))) token = do 
   (forthWord, _) <- sealed $ local (readFromStream .~ False) $ evalToken token
-  -- iop "handleHOT"
-  -- iop $ show forthWord
   case forthWord of
     UnknownE _ -> return arg
     DefE definition -> do
-      -- let effs = view (compOrExecIso.chosen._2) definition :: [StackEffect]
       let effs = definition ^. compOrExecIso.chosen._2._stefwiMultiEffects._Wrapped :: [StackEffect]
-      -- iop "EFF:"
-      -- mapM_ (iopP . render. P.stackEffect) effs
       adjustHOT effs
     KnownWord pw -> do
       when (has (_stacksEffects._CompAndExecutedEff) pw) $
@@ -240,17 +219,11 @@ handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ ) (Just (Unkn
       adjustHOT effs
   where
     adjustHOT effs = do
-      unless (length effs == 1) $ throwing _MultiHigherOrderArg () -- TODO eher unnoetig. überprüfe weiter unten bei effectIsSubtypeOf ob jeder effekt ein untertyp von mindestens einem typ im just ist!
+      unless (length effs == 1) $ throwing _MultiHigherOrderArg () 
       let eff = head effs :: StackEffect
 
-      iop "THIS IS THE EFF:"
-      iop $ render $ P.stackEffect eff
-      
       s <- getState
       let eff' = view (_unresolvedArgsTypes.at index) s :: Maybe StackEffect
-
-      -- iop $ "eff'"
-      -- iop $ show arg
 
       case eff' of
         Just eff'' -> do
@@ -260,7 +233,6 @@ handleHOTstreamArgument arg@(NotDefining (StreamArg (ArgInfo _ _ _ ) (Just (Unkn
         Nothing    -> do
           let newState = s & (_unresolvedArgsTypes.at index) ?~ eff
           putState newState
-          -- TODO why not done?
           return $ arg & _NotDefining._runtimeSpecified ?~ ResolvedR index eff
   
 

@@ -257,10 +257,10 @@ multiStackEffect (MultiStackEffect effs) = vcat $ map stackEffect effs
 
 colonDefinition' :: ColonDefinitionProcessed -> Doc
 colonDefinition' (ColonDefinitionProcessed c effsByPhase) = (case effsByPhase of
-                                                  Checked (StackEffectsWI effs (Intersection intersect)) -> (text ("Stack effect inferred: (" <> (if intersect then "" else "NOT ") <> " INTERSECT)")) $+$ (nested . multiStackEffect $ effs)
-                                                  NotChecked -> text "Stack effect not Checked"
-                                                  Forced (StackEffectsWI effs _) -> text "Stack effect forced" $+$ (nested . multiStackEffect $ effs)
-                                                  Failed s -> text ("FAILURE: " ++ s))
+    Checked (StackEffectsWI effs (Intersection intersect)) -> text ("Stack effect inferred: (" <> (if intersect then "" else "NOT ") <> " INTERSECT)") $+$ (nested . multiStackEffect $ effs)
+    NotChecked -> text "Stack effect not Checked"
+    Forced (StackEffectsWI effs _) -> text "Stack effect forced" $+$ (nested . multiStackEffect $ effs)
+    Failed s -> text ("FAILURE: " ++ s))
 
 colonDefinition'' :: ColonDefinition -> Doc
 colonDefinition'' (ColonDefinition _ (ColonDefinitionMeta n _)) = text ("COLON_DEFINTION " ++ n)
@@ -269,3 +269,19 @@ colonDefinition'' (ColonDefinition _ (ColonDefinitionMeta n _)) = text ("COLON_D
 realtype :: PrimType -> Doc
 realtype (PT x _ _ _ ) = text (show x)
 
+showAST ast = inBlockWithCaption  "ABSTRACT SYNTAX TREE" (text ast)
+showParseTree ast = inBlockWithCaption  "ORDER OF PARSERS" (text ast)
+
+showInfo (Info failures asserts) = 
+       let failure = if not $ null failures then
+                       inBlockWithCaption "General Type Errors" (vcat . map checkFailure $ failures)
+                     else mempty
+           assert = if not $ null asserts then
+                      inBlockWithCaption "ASSERT Type errors" (vcat . map assertFailure $ asserts)
+                    else mempty
+       in failure $+$ assert
+
+                    
+border = text $ replicate 30 '='
+inBlock x = border $+$ x $+$ border $+$ text "\n"
+inBlockWithCaption caption x = border $+$ text caption $+$ border $+$ x $+$ border $+$ text "\n"

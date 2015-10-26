@@ -26,16 +26,14 @@ import TF.Type.Nodes
 parseCreating :: ExpressionsM Expr
 parseCreating = do
 
-  iop $ "In create"
+  iopP $ "In create"
   let parseUnknown' :: CheckerM (ForthWord, DefiningArg)
       parseUnknown' = do
          uk <- parseUnknownToken'
          
-         -- iopP $ "Is an unknown named " ++ (view name uk)
          (forthWord, newState) <- evalUnknown uk
          modifyState (set _stateVar newState)
 
-         -- iopP $ render . P.forthWord $ forthWord
          unless (has _DefE forthWord) $ fail "not a defE"
 
          let (_, (StackEffectsWI effs _)) = forthWord ^?! (_DefE.compOrExecIso.chosen)
@@ -43,7 +41,6 @@ parseCreating = do
              defArg = preview (_Wrapped._head._streamArgs.traverse._Defining) effs
 
          when (isNothing defArg) $ fail "no defining args"
-         -- iopP $ "after eval"
 
          return (forthWord, defArg ^?! _Just)
 
@@ -59,10 +56,6 @@ parseCreating = do
 
   (creatingWord, definingArg) <- (lift $ try parseUnknown') </> parseCreate
 
-  -- iopP $ "has streamarguments: "
-  -- liftIO . mapM (putStrLn . show) $ streamArguments'
-  -- iopP $ "hallo?"
-
   -- TODO only parse init if no argType has been specified so far (Nothing)
   env <- ask
 
@@ -70,13 +63,12 @@ parseCreating = do
       betwe = (`runReaderT` env) $ parseStoringValue 
   maybeInitialization <- lift $ optionMaybe $ try $ (`runReaderT` env) $ parseStoringValue 
 
-  -- iop "IN between"
   -- TODO only parse does if no runtimetype has been specified so far (Nothing)
   maybeDoes <- lift $ withEmpty $ optionMaybe $ (`runReaderT` env) parseDoes
 
   -- let createExpr = Create (new _ForthWord creatingWord) maybeInitialization maybeDoes
   let createExpr = Create (ForthWord creatingWord) maybeInitialization maybeDoes
-  iop $ "Out create"
+  iopP $ "Out create"
   return createExpr
 
 parseDoes = do

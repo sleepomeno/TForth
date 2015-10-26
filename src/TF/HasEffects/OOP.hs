@@ -44,26 +44,19 @@ getStackEffects' (NewObject cOrE) = do
 getStackEffects' (SuperClassMethodCall className method) = do
     let getEffs :: [(Method, OOMethodSem)] -> [StackEffect]
         getEffs methods = concatMap (\(_, methodSem) -> case methodSem of { InferredByMethod (effs, _) -> effs ; ByDefinition (effs, _) -> effs }) $ filter (\(x,_) -> x == method)  methods
-    effs <- lift $ views _classInterfaces (getEffs . fromJust . M.lookup className) <$> getState -- :: CheckerM [StackEffect]
+    effs <- lift $ views _classInterfaces (getEffs . fromJust . M.lookup className) <$> getState 
     return $ withoutIntersect $ effsAsTuples $ (Compiled effs)
 
 getStackEffects' (MethodCall cOrE) = do
-    -- let compOrExec = compOrExec' cOrE
-    -- methodEffs <- lift $ compOrExec . concatMap snd <$> allMethodImplementationss (cOrE ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
-    methodEffs' <- lift $ allMethodImplementationss (cOrE ^. chosen') -- :: CheckerM (CompiledOrExecuted [StackEffect])
+    methodEffs' <- lift $ allMethodImplementationss (cOrE ^. chosen') 
     let methodEffs =  cOrE & chosen' .~ concatMap snd methodEffs'
     return $ withoutIntersect $ effsAsTuples methodEffs
 
 getStackEffects' (FieldCall cOrE) = do
-    -- let compOrExec = compOrExec' cOrE
-    -- fieldEffs <- lift $ compOrExec . concatMap snd <$> allFieldImplementations (cOrE ^. chosen) -- :: CheckerM (CompiledOrExecuted [StackEffect])
     fieldEffs' <- lift $ allFieldImplementations (cOrE ^. chosen') 
     let fieldEffs = cOrE & chosen' .~ concatMap snd fieldEffs'
     let fieldEffs' = fieldEffs ^. chosen'
 
-    -- iopC "FFFIEELDCALL"
-    -- liftIO (mapM_ (putStrLn . render . P.stackEffect) $ fieldEffs' )
-    -- iopC $ "is compiled: " ++ (show $ has _Compiled fieldEffs)
 
     return $ withoutIntersect $ effsAsTuples fieldEffs
 
@@ -127,51 +120,39 @@ getStackEffects' (NoName stackCommentEffects exprs clazz method) = do
                           classType = IndexedStackType (NoReference $ ClassType clazz) (Just uniqueIdentifier)
                       case topConsumingType of
                        Nothing -> do
-                         -- iopC $ "DDDDDDDDDDDd"
                          return $ eff & _before %~ (classType :) & _after %~ (++ [classType])
                        Just indexedType@(IndexedStackType Wildcard  i) -> do
-                         -- iopC $ "CCCCCCCCCCC"
                          let replaceWith indexedType target =  target.traverse.filtered (== indexedType) .~ classType
-                             replaceStreamTypes indexedType eff = eff
-                             -- & streamArgs.traverse._Defining.argType._Right.filtered (== indexedType) .~ classType
-                                                                  & _streamArgs.traverse._Defining._argType._Just.filtered (== indexedType) .~ classType
+                             replaceStreamTypes indexedType eff = eff & _streamArgs.traverse._Defining._argType._Just.filtered (== indexedType) .~ classType
                          return $ eff & _before %~ tail & _before %~ (classType:) & replaceWith  indexedType _before
                                       & replaceWith indexedType _after & replaceStreamTypes indexedType
                        Just indexedType@(IndexedStackType (NoReference (ClassType classname)) i) -> do
 
-                         iopC "BBBBBBBBBBBBBBBBB"
                          isSubtype <- (NoReference . ClassType $ clazz) `isSubtypeOf` (NoReference . ClassType $ classname)
 
                          unless isSubtype $ malformedMethodEffect
                          return $ eff & _before._head._stackType._NoReference._ClassType .~ clazz
                        Just _ -> do
-                         -- iopC "AAAAAAAAAAAAAAAAAAAAAA"
 
                          malformedMethodEffect
 
                     malformedMethodEffect = throwing _TopConsumingMustBeClassType ()
 
 
-                compColonEffects <- lift $ forM compColonEffects checkClassTypeArgument -- :: CheckerM [StackEffect]
-                stackCommentEffects' <- lift $ traverse (mapM checkClassTypeArgument) stackCommentEffects'  -- :: CheckerM (Maybe [StackEffect])
+                compColonEffects <- lift $ forM compColonEffects checkClassTypeArgument 
+                stackCommentEffects' <- lift $ traverse (mapM checkClassTypeArgument) stackCommentEffects'  
 
 
                 effs <- lift $ liftM (view chosen) . runExceptT  $ do
                         stEffs <- stackCommentEffects' ?? compColonEffects
 
-                        iopC $ "compcolon EFFEKTE:"
-                        mapM_ (iopC . render . P.stackEffect) $ compColonEffects 
-                        iop $ "spezifizierte EFFEKTE:"
-                        mapM_ (iopC . render . P.stackEffect) $ stEffs 
-                        -- iop $ "ZEIGE EFFEKTE:"
-                        -- liftIO (mapM_ (putStrLn . render . P.stackEffect) $ compColonEffects )
-                        -- liftIO (mapM_ (putStrLn . render . P.stackEffect) $ stEffs )
-                        -- let stackCommentIsOK = all (\x -> x `elem` compColonEffects) stEffs
-                        -- stackCommentIsOK <- allM (\x -> anyM (\y -> lift $ y `effectIsSubtypeOf` x) compColonEffects) stEffs
+                        -- iopC $ "compcolon EFFEKTE:"
+                        -- mapM_ (iopC . render . P.stackEffect) $ compColonEffects 
+                        -- iop $ "spezifizierte EFFEKTE:"
+                        -- mapM_ (iopC . render . P.stackEffect) $ stEffs 
                         stackCommentIsOK <- allM (\x -> anyM (\y -> do
                                                  iopC $ "Is " ++ render (P.stackEffect y) ++ " a subtype of " ++ render (P.stackEffect x) ++ "?"
                                                  lift $ y `effectIsSubtypeOf` x
-                                                 -- lift $ iop $ "Result is " ++ show res
                                                  ) compColonEffects) stEffs
 
 

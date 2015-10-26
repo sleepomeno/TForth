@@ -103,6 +103,7 @@ data CheckEffectsConfig = CheckEffectsConfig {
   _checkconfigForthWordOrExpr :: Maybe Node
 , _checkconfigIsForcedAssertion :: Bool
 , _checkconfigCheckState :: SemState
+, _checkconfigTellErrors :: Bool
 }  deriving (Show)
 
 
@@ -267,7 +268,7 @@ isImmediateColonDefinition = view $ meta.isImmediate
 emptyEffect = [StackEffect [] [] []]
 
         
-type Script'  = RWST ParseConfig () CustomState (ExceptT Error' (Writer Info)) 
+type Script'  = ReaderT ParseConfig (ExceptT Error' (StateT CustomState (Writer Info)))
 
 type StackEffectM = Script'  
 type StackEffects = (StackEffect, StackEffect)
@@ -319,7 +320,7 @@ instance HasDefault ParseStacksState where
   def = ParseStacksState forthTypes def [] False False 
 
 instance HasDefault CheckEffectsConfig where
-  def = CheckEffectsConfig Nothing False INTERPRETSTATE
+  def = CheckEffectsConfig Nothing False INTERPRETSTATE True
 
 instance HasDefault ParseStackState where
   def = ParseStackState [] [] [] False
@@ -371,3 +372,4 @@ instance HasDefault SemanticsState where
 
 instance HasDefault (Maybe x) where
   def = Nothing
+

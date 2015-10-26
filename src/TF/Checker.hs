@@ -54,12 +54,12 @@ removeWildcards effs = do
                                                   >=> uncurry sameDegree)                                                  >>> runWriterT) (zipzap effs) ) :: CheckerM [((StackEffects, StackEffects), [ChangeState])])
   let stateChanges' = filter (not . null) stateChanges
   when (not (null stateChanges') && length (group stateChanges') /= 1) $ do
-         lift $ blocked $ mapM_ (iopC . show) stateChanges'
+         lift $ blocked iopC $ mapM_ (iopC . show) stateChanges'
          throwing _DifferentChangeStates ()
 
   runMaybeT $ do
      stateChanges'' <- hoistMaybe $ headMay stateChanges'
-     lift $ blocked $ mapM_ (iopC . show) stateChanges'
+     lift $ blocked iopC $ mapM_ (iopC . show) stateChanges'
      forM_ stateChanges'' $ \case
         ReferenceDegree identifier diff -> lift $ adjustDegree identifier diff
         ResolveUnknown identifier dataType -> lift $ resolveUnknownType identifier dataType
@@ -71,7 +71,7 @@ removeWildcards effs = do
   return $ zipzap result
 
 resolveUnknownType :: Identifier -> DataType -> CheckerM ()
-resolveUnknownType identifier arg = blocked $ do
+resolveUnknownType identifier arg = blocked iopC $ do
   -- iopW "RESOLVE UNKNOWN TYPES OF"
   targets1 <- toListOf (_definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isUnknownType) <$> getState 
   targets2 <- toListOf (_definedWords'.traverse._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped.traverse._streamArgs.traverse._Defining._argType._Just) <$> getState 
@@ -93,7 +93,7 @@ updateFields :: (StackEffect -> StackEffect) -> ClassName -> [(Variable, OOField
 updateFields updateStackEffect _ fields = for fields $ second (fmap updateStackEffect)
 
 adjustDegree identifier diff = do
-  blocked $ do
+  blocked iopC $ do
      iopW $ "CHANGE REFERENCE DEGREES BY " ++ show diff ++ " OF"
      targets <- toListOf (_definedWords'.traverse._CreateDef.traverse._after.traverse.filtered isTarget) <$> getState
      iopW . render . vcat . map P.dataType $ targets
@@ -182,10 +182,13 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
                                                   (nrOfNewExecEffs > 1 && not newExecI)) || not (oldExecI || newExecI))
 
   let errorInfo = do
-        lift . lift . lift $ tell $ Info [CheckFailure realEffs stE2s] []
         fwordOrExpr <- asks (view forthWordOrExpr)
-        when (has (_Just._Expr._Assert) fwordOrExpr) $
-           lift . lift . lift $ tell $ Info [] [AssertFailure realEffs stE2s] 
+        tellErrors' <- asks (view tellErrors)
+        lift . lift . lift $ when tellErrors' $
+           if (has (_Just._Expr._Assert) fwordOrExpr) then
+              tell $ Info [] [AssertFailure realEffs stE2s]
+           else
+              tell $ Info [CheckFailure realEffs stE2s] []
 
         return $ case fwordOrExpr of
           Just x  -> render $ either P.infoForthWord P.infoExpr $ view nodeIso $ x
@@ -194,15 +197,15 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
 
 
   when (compileEffectError || execEffectError) $ do
-    iop $ "compileEffectError: " <> show compileEffectError
-    iop $ "execEffectERror: " <> show execEffectError
-    iop $ "execEffectClash: " <> show execEffectClash
-    iop $ "oldCompileI: " <> show oldCompileI
-    iop $ "newCompileI: " <> show newCompileI
-    iop $ "oldExecI: " <> show oldExecI
-    iop $ "newExecI: " <> show newExecI
+    iopC $ "compileEffectError: " <> show compileEffectError
+    iopC $ "execEffectERror: " <> show execEffectError
+    iopC $ "execEffectClash: " <> show execEffectClash
+    iopC $ "oldCompileI: " <> show oldCompileI
+    iopC $ "newCompileI: " <> show newCompileI
+    iopC $ "oldExecI: " <> show oldExecI
+    iopC $ "newExecI: " <> show newExecI
     message <- errorInfo
-    iop $ "message: " <> show message
+    iopC $ "message: " <> show message
     -- throwing (_TypeClashM._MultiEffs) message
     throwing _Clash message
 
@@ -286,30 +289,21 @@ handleArgs (Defining arg) = do
                                 (withEmpty $ do
 
                                   -- undefined
-                                  iop $ "defaulruntime is"
-                                  iop $ show defaultRuntimeType
+                                  iopC $ "defaulruntime is"
+                                  iopC $ show defaultRuntimeType
                                   modifyState $ _effects._Wrapped._1.traverse._1 .~ defaultRuntimeType'
-                                  -- iopC "Current Effects"
-
-                                  -- effs <- view realEffects <$> getState
-                                  -- liftIO . mapM (putStrLn . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e)) $ effs
-                                  -- iopC "SSSSSSSSSSSSSSS"
-                                  -- let runtimeEffects'' = withoutIntersect (maybeRuntimeType ^?! _Just) :: ForthEffect
                                   let runtimeEffects'' = maybeRuntimeType ^?! _Just
-                                      runtimeEffects' = runtimeEffects'' -- & _Wrapped._1.traverse.both._before %~ reverse & _Wrapped._1.traverse.both._after %~ reverse
-                                  -- TODO add intersect to runtimeType of definingargument
+                                      runtimeEffects' = runtimeEffects'' 
 
-                                  -- iopC "runtime effects"
-                                  -- liftIO . mapM (putStrLn . (\(c,e) -> render $ P.stackEffect c $+$ P.stackEffect e)) $ runtimeEffects'
-                                  iop "BEFORE"
+                                  iopC "BEFORE checking runtime effect of defining argument"
                                   flip runReaderT def $ checkEffects runtimeEffects'
-                                  iop "AFTER"
+                                  iopC "AFTER checking runtime effect of defining argument"
                                   result <- toListOf (_effects._Wrapped._1.traverse._1) <$> getState
 
                                   result' <- replaceWrappers result
                                   
 
-                                  iopC "result of runtime checking"
+                                  iopC "result of runtime checking of defining argument"
                                   mapM_ (iopC . (render . P.stackEffect)) $ result'
 
                                   return result')

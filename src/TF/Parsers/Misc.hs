@@ -35,8 +35,6 @@ parseExecute = do
 
   parseWordExecute
 
-  -- iop $ "______ EXECUTE ______"
-
   return $ Execute $ assert' ^?! _Assert._1
 
 parseInclude :: ExpressionsM Expr
@@ -60,8 +58,6 @@ parseTick = do
   guard $ has (_Assert._1._Compiled) assert'
   guard $ has (_stacksEffects._CompiledEff) pw -- TODO _Compiled Or _compiledandexecuted
 
-  iop $ "-------- TICK --------"
-  
   return $ Tick (assert' ^. _Assert._1._Compiled) pw
 
 parseInterpreted :: ExpressionsM Expr
@@ -76,7 +72,6 @@ parseInterpreted = do
 
 parseColon :: ExpressionsM Expr
 parseColon = do
-  -- iop "prse colon"
   parseWordColon
   w <- lift $ possWordAsString <$> anyToken 
 
@@ -99,19 +94,11 @@ parseColon = do
       parseBody = do
         (colonDefinition, expr) <- parseColonDefinitionBody 
         lift $ modifyState (over _definedWords' $ M.insert w (ColDef (ColonDefinitionProcessed colonDefinition NotChecked)))
-        -- modifyState (over definedWords $ M.insert w colonDefinition)
-        -- modifyState (lastColonDefinition ?~ w)
         lift $ modifyState $ set _currentCompiling False
         return $ (createColon colonDefinition) w stackComment expr
 
   let typeCheckingFails :: String -> ExpressionsM Expr
       typeCheckingFails reason =  do
-        -- iopP $ "failing with reason: " ++ reason
-
-        -- inp <- getInput
-        -- mapM_ iopS inp
-        iop "blobb"
-        iop reason
 
         allowLocalFailure' <- lift $ view allowLocalFailure
         unless allowLocalFailure' $ throwing _Clash reason
@@ -128,32 +115,22 @@ parseCast :: ExpressionsM Expr
 parseCast = do
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   (sem, _) <- lift $ parseStackEffectSemantics parseCast'
-  iop "CAST"
-  iop $ show sem
   let effs = sem ^. _semEffectsOfStack._stefwiMultiEffects._Wrapped
   compOrExec <- compOrExec'
   return $ Cast (compOrExec effs)
 
 parseAssertion :: ExpressionsM Expr
 parseAssertion = do
-  iop "TRY ASSERTION"
-  -- inputs <- getInput
-  -- liftIO $ mapM print inputs
-
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   (sem, forced) <- lift $ parseStackEffectSemantics parseAssertion'
-  iop "ASSERTION"
-  -- iop $ show sem
   let effs = sem ^. _semEffectsOfStack._stefwiMultiEffects._Wrapped
   compOrExec <- compOrExec'
   return $ Assert (compOrExec effs) forced
   
 parseRawAssertion :: ExpressionsM Expr
 parseRawAssertion = do
-  -- iop $ "TRY RAW_ASSERTION"
   parseStackEffectSemantics <- view parseStackEffectSemantics'
   (sem, forced) <- lift $ parseStackEffectSemantics parseEffect
-  -- iop $ "RAW_ASSERTION"
   let effs = sem ^. _semEffectsOfStack._stefwiMultiEffects._Wrapped
   compOrExec <- compOrExec'
   return $ Assert (compOrExec effs) forced

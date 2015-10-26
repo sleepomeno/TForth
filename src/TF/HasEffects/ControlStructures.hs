@@ -25,9 +25,9 @@ import TF.Type.Nodes
 import TF.HasEffects.HasStackEffects
 
 getStackEffects' (IfElseExpr thens elses) = do
-    -- lift $ depth += 1
     checkNodes <- view _1
 
+    -- TODO check exec effects -- must not leave anything on the stack!
     (thenEff, isThenIntersect) <- lift $ withEmpty $ do
       (ForthEffect (thenEffs, isThenIntersect)) <- checkNodes thens
       flag' <- flag''
@@ -42,24 +42,15 @@ getStackEffects' (IfElseExpr thens elses) = do
 
     forbidMultiEffs <- lift $ views allowMultipleEffects not
 
-    iop $ "\n\nCOMMON TYPE\n\n"
-
     maybeCommonType <- do
       guard1 <- allM (\(x1, x2) -> anyM (\(y1, y2) -> do
         res1 <- ((y1, isThenIntersect) `effectMatches'` (x1, isElseIntersect))
-        -- res1 <- y1 `effectIsSubtypeOf` x1
-        -- res2 <- y2 `effectIsSubtypeOf` x2
         return $ res1) thenEff) elseEff
       guard2 <- allM (\(x1, x2) -> anyM (\(y1, y2) -> do
         res1 <- ( (y1, isElseIntersect) `effectMatches'` (x1, isThenIntersect))
-        -- res1 <- y1 `effectIsSubtypeOf` x1
-        -- res2 <- y2 `effectIsSubtypeOf` x2
         return $ res1) elseEff) thenEff
       return $ msum [(guard guard1) >> Just thenEff, (guard guard2) >> Just elseEff] 
 
-    -- iop $ "show maybecommentype: " <> (show $ isNothing maybeCommonType)
-    -- when (isJust maybeCommonType) $ void $
-    --    showEffs (fromJust maybeCommonType)
 
     when (forbidMultiEffs && isNothing maybeCommonType) $
       lift $ throwing (_TypeClashM . _IfElseExprNotStatic) ("IF_BRANCH: " <> showEffects thenEff, "ELSE_BRANCH: " <> showEffects elseEff)
@@ -90,9 +81,6 @@ getStackEffects' (IfExpr forthWordsOrExprs) = do
       flag' <- lift flag''
       return $ ForthEffect $ result & _1.traverse._1._before %~ (flag':)
 
-    iop "if culprits"
-    -- showEffs $ res ^. _1
-    
     return res
 
 getStackEffects' (BeginUntil tokens) = do
@@ -105,7 +93,6 @@ getStackEffects' (BeginUntil tokens) = do
     where
      removeLastFlag eff effects = (`runContT` return) $ callCC $ \ret -> do
       lift $ when (eff & view (_after.to length) & (/=1)) $ throwing _BeginUntilNoFlag (showEffects effects)
-      -- lift $ iopC $ "last datatype is: " <> (show $ eff ^.. _after._head._1)
       lift $ unlessM (lastDatatypeIsFlag eff) $ throwing _BeginUntilNoFlag (showEffects effects)
       return $ eff & _after %~ tail
 

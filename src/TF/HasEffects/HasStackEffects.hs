@@ -1,4 +1,10 @@
-module TF.HasEffects.HasStackEffects where
+module TF.HasEffects.HasStackEffects (
+    effectMatches'
+  , effectMatches
+  , HasStackEffects
+  , getStackEffects
+
+  ) where
 
 import           TF.Types                 hiding (isSubtypeOf, word)
 import TF.Type.Nodes
@@ -26,52 +32,32 @@ effectMatches eff1 eff2 = handling _TypeClash (const $ return False) $ withEmpty
   let before' = StackEffect [] [] (eff1 ^. _before)
       after' = StackEffect (eff1 ^. _after) [] []
   checkEffects' <- asks (view _2) :: CheckerM' CheckEffectsT
-  lift $ (`runReaderT` def) $ do
+  lift $ (`runReaderT` def) $ local (tellErrors .~ False) $ do
     checkEffects' $ withoutIntersect [(before', StackEffect [] [] [])]
     checkEffects' $ withoutIntersect [(eff2, StackEffect [] [] [])]
     checkEffects' $ withoutIntersect [(after', StackEffect [] [] [])]
   s <- lift getState
   let eff = map fst (s ^. _effects._Wrapped._1)
-  iop "Das sind die effekte:"
-  iop $ show eff
 
+  iopE "Effects to match:"
+  iopE  "constraints eff1"
+  mapM_ (iopE . show) (constraints eff1)
+  iopE "constraints eff2"
+  mapM_ (iopE . show) (constraints eff2)
 
-
-  iop " eff1"
-  -- showEffs' [eff1]
-  iop $ "constraints eff1"
-
-  mapM (iop . show) (constraints eff1)
-  iop $ "constraints eff2"
-  mapM (iop . show) (constraints eff2)
   return $ (all (`elem` constraints eff2) $ constraints eff1) &&  ((==0) . length . filter (not . (\eff -> eff ^. _before == [] && eff ^. _after == [])) $ eff)
 
 effectMatches' :: (StackEffect, Intersections) -> (StackEffect, Intersections) -> CheckerM' Bool
--- effectMatches' (eff1, int1) (eff2, int2)  = handling _TypeClash (const $ return False) $ withEmpty' $ do
 effectMatches' (eff1, int1) (eff2, int2) = handling _TypeClash (const $ return False) $ withEmpty''' $ do
--- effectMatches' (eff1, int1) (eff2, int2) = withEmpty' $ do
--- effectMatches' (eff1, int1) (eff2, int2)  = _hand $ withEmpty' $ do
   let before' = StackEffect [] [] (eff1 ^. _before)
       after' = StackEffect (eff1 ^. _after) [] []
   checkEffects <- asks (view _2 )
-  lift $ (`runReaderT` def) $ do
+  lift $ (`runReaderT` def) $ local (tellErrors .~ False) $ do
     checkEffects $ withIntersect int1 [(before', StackEffect [] [] [])]
     checkEffects $ withIntersect int2 [(eff2, StackEffect [] [] [])]
     checkEffects $ withIntersect int1 [(after', StackEffect [] [] [])]
   s <-  lift getState
   let eff = map fst (s ^. _effects._Wrapped._1)
-  -- iop "Das sind die effekte:"
-  -- iop $ show eff
-
-
-
-  -- iop " eff1"
-  -- showEffs' [eff1]
-  -- iop $ "constraints eff1"
-
-  -- mapM (iop . show) (constraints eff1)
-  -- iop $ "constraints eff2"
-  -- mapM (iop . show) (constraints eff2)
 
   
   return $ (all (`elem` constraints eff2) $ constraints eff1) &&  ((==0) . length . filter (not . (\eff -> eff ^. _before == [] && eff ^. _after == [])) $ eff)

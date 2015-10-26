@@ -161,8 +161,7 @@ prepareUnresolvedArgsTypes (sem, forced) = do
 parseStackEffectSemantics :: (String -> ParseStackEffectsConfig -> Script' ParseEffectResult) -> CheckerM (Semantics, Bool)
 parseStackEffectSemantics p = do
   stackEffect' <- parseStackEffectString   :: CheckerM String
-  iop $ "stackeffect-string:"
-  iop $ stackEffect'
+  iopP $ stackEffect'
 
   classes' <- views _classInterfaces (map fst . M.toList) <$> getState
   classes'' <- views _classFields (map fst . M.toList) <$> getState

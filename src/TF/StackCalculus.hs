@@ -21,7 +21,6 @@ import TF.Type.Nodes
 
 applyRule1 :: (StackEffect, StackEffect) -> MaybeT StackRuleM StackEffect
 applyRule1 (stE1,stE2) = do
-  -- iop $ "will 1 be applied?"
   let b = null $ stE1 ^. _after -- views after null stE1
   forcedAssertion <- view isForcedAssertion
 
@@ -29,11 +28,6 @@ applyRule1 (stE1,stE2) = do
     void typeClash
 
   assert b
-   
-  -- iop $ "stE1"
-  -- iop $ render . P.stackEffect $ stE1
-  -- iop $ "stE2"
-  -- iop $ render . P.stackEffect $ stE2
 
   -- Rule 1 is applicable if @after@ of state is empty
   let beforeTypes2 = stE2 ^. _before 
@@ -42,13 +36,13 @@ applyRule1 (stE1,stE2) = do
   return $ stE1 &~ _before %= (++ beforeTypes2) &~ _after .= toTypes2
            &~ _streamArgs %= (++ view _streamArgs stE2) & _streamArgs %~ resolveArgs
 
+-- TODO remove?
 resolveArgs :: [DefiningOrNot] -> [DefiningOrNot]
-resolveArgs  = id -- filter (either (view resolved >>> isNothing) (view resolved >>> isNothing)) 
+resolveArgs  = id 
 
 ---- Rule 2 ------
 applyRule2 :: (StackEffect, StackEffect) -> MaybeT StackRuleM StackEffect
 applyRule2 (stE1,stE2) = do
-  -- iop $ "will 2 be applied?"
   let before2 = stE2 ^. _before 
       after2 = stE2 ^. _after 
       after1 = stE1 ^. _after 
@@ -64,19 +58,16 @@ applyRule2 (stE1,stE2) = do
 ---- Rule 3 ------
 applyRule3 :: (StackEffect, StackEffect) -> MaybeT StackRuleM StackEffect
 applyRule3 (stE1, stE2) = do
-    -- iop $ "will 3 be applied?"
-    
-    
     IndexedStackType topOfStack _ <- hoistMaybe $ preview (_after.traverse) stE1
     IndexedStackType topOfArgs _  <- hoistMaybe $ preview (_before.traverse) stE2
     typesMatch <- lift $ lift $ lift $ topOfStack `isSubtypeOf` topOfArgs
     assert (not typesMatch)
     -- Rule 3 is applicable if the top of stack of both effects match
-    iop $ "CLASH: "
-    iop $ "topOfStack"
-    iop $ show topOfStack
-    iop $ "topOfArgs"
-    iop $ show topOfArgs
+    iopSC "CLASH: "
+    iopSC "topOfStack"
+    iopSC $ show topOfStack
+    iopSC "topOfArgs"
+    iopSC $ show topOfArgs
     typeClash
 
 
@@ -85,7 +76,6 @@ applyRule4 :: StackEffect -> StackEffect -> CheckerM (StackEffect, StackEffect)
 applyRule4 stE1 stE2 = chosen' $ applyRule4' stE1 stE2
    where
      applyRule4' stE1 stE2 = do
-        -- iop $ "will 4 be applied?"
 
         tS@(IndexedStackType topOfStack _) <- firstOf (_after.traverse) stE1 ?? (stE1, stE2)
         tA@(IndexedStackType topOfArgs _)  <- firstOf (_before.traverse) stE2 ?? (stE1, stE2)

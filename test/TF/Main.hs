@@ -21,9 +21,9 @@ import Data.List (isInfixOf)
 import           Test.Hspec                   hiding (after, before)
 import           Test.Hspec.Expectations.Lens
 
-_ParseState = _1._2
-_Success = _Right
-_Failure = _Left
+_ParseState = _2
+_Success = _1._Right
+_Failure = _1._Left
 
 checker1 = ParseConfig {}
     & typeCheck                    .~ True
@@ -139,14 +139,14 @@ simpleStackCalculus = do
 
   it "A single top-level, known word type checks" $
 
-      check "#>" `shouldHave` _Right
+      check "#>" `shouldHave` _Success
 
   it "A valid top-level composition type checks" $
 
-      check "#> 3" `shouldHave` _Right
+      check "#> 3" `shouldHave` _Success
 
   it "An invalid top-level composition type clashes" $
-      check "3 #>" `shouldHave` (_Left._TypeClash)
+      check "3 #>" `shouldHave` (_Failure._TypeClash)
 
 allowLocalFailureFeature = do
   let check = fst . runChecker' (defTestConfig & allowLocalFailure .~ True)
@@ -167,7 +167,7 @@ simpleColonDefinition = do
   let check = fst . runChecker' defTestConfig
 
       getColonDefEffects w program =
-        preview (_Right._1._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]
+        preview (_1._Right._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]
       effectsOfColonDefinition = _ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped
 
       name = "myword"
@@ -245,29 +245,29 @@ oopFeature = do
     context "favours the forced effect specified on class definition" $ do
       it "when the method implementation does not type check" $ do
         let result = check "object class var text method init ( -!- n n ) end-class button :noname 9 0= + ; button defines init"
-        result `shouldHave` _Right
+        result `shouldHave` _Success
       it "when the method implementation has a different inferred effect" $ do
         let result = check "object class var text method init ( -!- n n ) end-class button :noname + ; button defines init"
-        result `shouldHave` _Right
+        result `shouldHave` _Success
     it "there is an error when the method implementation and the class definition have both a stack comment" $ do
         let result = check "object class var text method init ( n -- n ) end-class button :noname ( n -- n ) + ; button defines init"
-        result `shouldHave` (_Left._ErrorO._DefinedTwice)
+        result `shouldHave` (_Failure._ErrorO._DefinedTwice)
     context "when there is not a stack comment specified on class definition but on the method implementation" $ do
       it "succeeds when the inferred effect of the method implementation matches the stack comment" $ do
         let result = check "object class var text method init end-class button :noname ( button -- button n n ) 2 3 ; button defines init"
-        result `shouldHave` _Right
+        result `shouldHave` _Success
       it "fails when the inferred effect of the method implementation does not match the stack comment" $ do
         let result = check "object class var text method init end-class button :noname ( -- n ) 2 3 ; button defines init"
-        result `shouldHave` (_Left._ErrorO._OOPErrT._NotMatchingStackComment)
+        result `shouldHave` (_Failure._ErrorO._OOPErrT._NotMatchingStackComment)
 
 
 create = do
   let check = fst . runChecker' defTestConfig
 
       getColonDefEffects w program =
-        (preview (_Right._1._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_1._Right._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]) ^?! _Just
       getCreateDefEffects w program =
-        (preview (_Right._1._2._definedWords'.at w._Just._CreateDef) (check program) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_1._Right._2._definedWords'.at w._Just._CreateDef) (check program) :: Maybe [StackEffect]) ^?! _Just
   it "when a colon definition's body contains 2 'create' the compiled effect contains two defining arguments" $ do
     let name = "myfunc"
         colonDef = ": myfunc create create ;"
@@ -477,9 +477,9 @@ assertions = do
   let check = fst . runChecker' (defTestConfig & allowLocalFailure .~ True)
 
       getColonDefEffects w program =
-        (preview (_Right._1._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_1._Right._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]) ^?! _Just
       getCreateDefEffects w program =
-        (preview (_Right._1._2._definedWords'.at w._Just._CreateDef) (check program) :: Maybe [StackEffect]) ^?! _Just
+        (preview (_1._Right._2._definedWords'.at w._Just._CreateDef) (check program) :: Maybe [StackEffect]) ^?! _Just
   it "throws an error failure" $ do
     let program = ": foo 2 3 ( Assert xt ) + ;"
         result = fst $ runChecker' (defTestConfig & allowLocalFailure .~ False) program
@@ -518,7 +518,7 @@ assertions = do
 
 immediate = do
   let check = fst . runChecker' defTestConfig
-      getColonDefEffects w program = preview (_Right._1._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]
+      getColonDefEffects w program = preview (_1._Right._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]
   it "postponing an immediate word just undoes the immediate nature" $ do
       let program = ": foo + ; immediate : bla postpone foo ;"
           effects1 :: Maybe [StackEffect]
@@ -537,18 +537,18 @@ immediate = do
 subtyping = do
   let check = fst . runChecker' (defTestConfig & subtypes .~ getDefaultSubtypes)
   it "top level" $
-    check "4 bl +" `shouldHave` _Right
+    check "4 bl +" `shouldHave` _Success
   it "as a reference is a subtype of another if the referenced value is a subtype of the other referenced value" $
-    check "create foo 4 , create bar bl , bl foo !" `shouldHave` _Right
+    check "create foo 4 , create bar bl , bl foo !" `shouldHave` _Success
   
 
 main :: IO ()
 main = hspec $
   describe "runChecker'" $ do
     let check = fst . runChecker' defTestConfig
-        getCreateDefEffects w program = (preview (_Right._1._2._definedWords'.at w._Just._CreateDef) (check program) :: Maybe [StackEffect]) ^?! _Just
+        getCreateDefEffects w program = (preview (_1._Right._2._definedWords'.at w._Just._CreateDef) (check program) :: Maybe [StackEffect]) ^?! _Just
         getColonDefEffects w program =
-          preview (_Right._1._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]
+          preview (_1._Right._2._definedWords'.at w._Just._ColDef.processedEffects._Checked._stefwiMultiEffects._Wrapped) (check program) :: Maybe [StackEffect]
 
 
     describe "Allow failure of colon definition type checking if it is not used:"  allowLocalFailureFeature
@@ -586,11 +586,11 @@ main = hspec $
 
 
     it "parses an xt with effect in stack effect" $
-          check  ": foo ( xt:[ -- ] -- ) drop ;" `shouldHave` _Right
+          check  ": foo ( xt:[ -- ] -- ) drop ;" `shouldHave` _Success
     it "parses an xt without effect in stack effect" $
-          check  ": foo ( xt -- ) drop ;" `shouldHave` _Right
+          check  ": foo ( xt -- ) drop ;" `shouldHave` _Success
     it "parses an xt without effect in stack effect and clashes on not matching stack comment" $
-          check  ": foo ( xt -- ) + ;" `shouldHave` (_Left._TypeClash._NotMatchingStackComment)
+          check  ": foo ( xt -- ) + ;" `shouldHave` (_Failure._TypeClash._NotMatchingStackComment)
 
     context "type checks subtyping" subtyping
 

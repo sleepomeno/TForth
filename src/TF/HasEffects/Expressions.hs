@@ -89,14 +89,10 @@ instance HasStackEffects Expr where
         let typeOfCreated :: Maybe IndexedStackType
             typeOfCreated = stEffs ^?! _head & preview (_after._head)
 
-        -- when (typeOfCreated == Nothing) $ iop "UNGLEICH NOTHING"
-
         lift $ checkNodes [comma]
 
 
         effs <- lift effectsOfState
-        -- iopC "Current State:\n"
-        -- liftIO $ mapM_ (putStrLn . render . P.stackEffect) effs
         maybe (liftUp . lift  $ preview (_head._before._head) effs E.?? (_Impossible # "No top stack value in maybeInitType")) return typeOfCreated) :: CheckerM (Maybe IndexedStackType)
 
       result <- case maybeInitType of
@@ -106,8 +102,6 @@ instance HasStackEffects Expr where
                       go (newCreating, init ^?! _Just._1, init ^? _Just._2, does)
 
       effs <- effectsOfState
-      -- iopC "Show effects of create:\n"
-      -- showEffs' effs
       return result
 
     where
@@ -115,12 +109,6 @@ instance HasStackEffects Expr where
              _DefE.chosen'._2._stefwiMultiEffects._Wrapped
            else
              _KnownWord._stacksEffects.chosen''._Wrapped
-
-    -- iopC "Show effects of create:\n"
-    -- liftIO $ mapM_ (putStrLn . render . P.stackEffect) effs
-
-    -- iopC $ "The Create-----\n"
-    -- iopC $ render . either P.forthWord P.expr $ create
 
   getStackEffects (ColonExprImmediate colonName stackCommentEffects bodyWords) = getStackEffects (ColonExpr colonName stackCommentEffects bodyWords)
 
@@ -146,7 +134,6 @@ instance HasStackEffects Expr where
     getStackEffects (KnownWord pw'')
 
   getStackEffects (Execute effects') = do
-    iop "getStackEffects Execute"
     let effects = effects' ^. chosen'
     unless (length effects == 1) $ throwing (_ErrorE . _MultipleEffects) () 
     let effect = effects ^?! _head
@@ -169,7 +156,6 @@ instance HasStackEffects Expr where
     return $ withoutIntersect $ executeEffs
 
   getStackEffects (Cast effs) = do 
-    -- iopC "cast-effekts"
     unlessM (lift $ view allowCasts) $ throwing _CastsNotAllowed ()
     return $ withoutIntersect $ effsAsTuples effs
 
@@ -177,9 +163,6 @@ instance HasStackEffects Expr where
     let beforeToAfter :: StackEffect -> StackEffect
         beforeToAfter eff = eff & _before .~ (eff ^. _after)
         effs' = bimap (map beforeToAfter) (map beforeToAfter) . view compOrExecIso $ effs
-
-    -- iopC "assert-effekts"
-    -- mapM (iopC . render . P.stackEffect) (effs' ^. chosen)
 
     when (has (chosen'.traverse._before._head) effs) $ throwing _MalformedAssert "No before arguments allowed"
     when (has (chosen'.traverse._streamArgs.traverse._Defining) effs) $ throwing _MalformedAssert "No defining arguments allowed!"

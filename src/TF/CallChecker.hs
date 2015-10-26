@@ -6,14 +6,15 @@ import           Control.Lens hiding (noneOf,(??))
 import Lens.Family.Total hiding ((&), Empty)
 import           Control.Monad
 import           Control.Monad.Writer
-import  Text.PrettyPrint (render,vcat, text, ($+$), nest)
+import           Control.Monad.State
+import           Control.Monad.Reader
+import  Text.PrettyPrint (render,vcat, text, ($+$), nest, Doc)
 
 import           Control.Monad.RWS
 import           Control.Monad.Cont
 import           TF.Parsers.Parser
 import           TF.Parsers.Tokenizer
 import           TF.Util
-import           TF.CheckerUtils (showCheckerState)
 import           TF.Types hiding (word)
 import TF.Subtypes
 import           Text.Parsec hiding (token)
@@ -62,7 +63,7 @@ checkStaticFile conf file = do
   hClose handle  
   
 
-runChecker' :: ParseConfig -> String -> (Either Error' (([Node], ParseState), TreePos Full String), Info)
+runChecker' :: ParseConfig -> String -> (((Either Error' ([Node], ParseState)), TreePos Full String), Info)
 -- runLoggingT (\loc logsource level logText -> putStrLn logText) . 
 runChecker' conf s = do 
 
@@ -73,18 +74,15 @@ runChecker' conf s = do
          b = liftM (E.fmapL (review (_ErrorP._ParseErr') . show)) a
          c :: StackEffectM ([Node], ParseState)
          c = lift . hoistEither =<< b
-         -- d :: Script' (([Node], ParseState), ())
-         d = evalRWST (c >>= \res -> do { exprs <- gets checkedExpressions; return (res, exprs)} ) conf (CustomState (fromTree (Node "" [])) 0 M.empty)
-         e :: (Either Error' (([Node], ParseState), TreePos Full String), Info)
-         -- e = return . runIdentity . runWriterT $ runEitherT $ fmap fst $ flip runReaderT conf $ d
-         e = runIdentity . runWriterT $ runExceptT  $ fmap fst $  d
+         d :: ExceptT Error' (StateT CustomState (Writer Info)) ([Node], ParseState)
+         d = flip runReaderT conf c 
+         e = runIdentity . runWriterT . fmap (second checkedExpressions) . (`runStateT` (CustomState (fromTree (Node "" [])) 0 M.empty)) . runExceptT $ d
      e
   where
      runProgramParser :: String -> StackEffectM (Either ParseError ([Node], ParseState))
      runProgramParser s = do
        words' <- parseWords s
        runParserT parseProgram (defParseState & _subtypeRelation .~ subtypeRelation' primitiveTypes (conf ^. subtypes)) "" words'
-     -- showInfo :: Info -> IO ()
 
 defParseState :: ParseState
 defParseState = ParseState M.empty M.empty INTERPRETSTATE False emptyForthEffect (M.fromList [("object", [])]) (M.fromList [("object", [])]) S.empty M.empty [] (Trace (fromTree $ Node "" []))
@@ -93,30 +91,23 @@ defParseState = ParseState M.empty M.empty INTERPRETSTATE False emptyForthEffect
          
 runChecker :: ParseConfig -> String -> IO ()
 runChecker config s = do
-    let (res, info) = runChecker' config s
+    let ((res,treeZipper), info) = runChecker' config s
     showInfo info
+    putStrLn . render . P.showParseTree . drawTree . toTree $ treeZipper
     case res of
       Left err -> putStrLn $ "Error: " ++ show err
-      Right (result,treeZipper) -> do
-
-
-        putStrLn . drawTree . toTree $ treeZipper
+      Right result -> do
         showResult result
    where
      showResult :: ([Node], ParseState) -> IO ()
      showResult (_, parseState) = do
        let checkerState = showCheckerState parseState
            effs = showEffects' . view (_effects._Wrapped._1) $ parseState
-       putStrLn . drawTree . toTree . view (_trace._Wrapped) $ parseState
+       putStrLn . render . P.showAST . drawTree . toTree . view (_trace._Wrapped) $ parseState
        putStrLn checkerState
        putStrLn effs
      showInfo :: Info -> IO ()
-     showInfo (Info failures asserts) = do
-       -- let docs = for fexprs $ \fexpr -> nest 0 (P.infoNode fexpr)
-       -- let info = text "INFO:" $+$ nest 1 (vcat docs)
-       let failure = text "FAILURES:" $+$ nest 1 (vcat . map P.checkFailure $ failures)
-           assert = text "ASSERT FAILURES:" $+$ nest 1 (vcat . map P.assertFailure $ asserts)
-       blockedWith "WRITER:" $ iop . render $ failure $+$ assert
+     showInfo info = putStrLn . render $ P.showInfo info
        
      renderForthWordsOrExpr = showBoth . first (render . P.pprint) 
      showEffects' :: [(StackEffect, StackEffect)] -> String
@@ -127,3 +118,22 @@ runChecker config s = do
 
 
   
+
+showCheckerState :: ParseState -> String
+showCheckerState st = unlines [showDefinitions st, showClasses st]
+showDefinitions :: ParseState -> String
+showDefinitions st =
+  let showColonDefinition name colonDef = render $ text name $+$ P.nested (P.colonDefinition' colonDef)
+      showCreate name effs = render $ text name $+$ P.nested (vcat $ map P.stackEffectNice effs)
+      keysValues = M.toList $ view _definedWords' st :: [(String, Definition)]
+      in
+  "DICTIONARY:\n\n" ++ (unlines . map (++ "\n") . map (\(name,y) -> case y of 
+                                      ColDef x -> showColonDefinition name x
+                                      CreateDef x -> showCreate name x) $ keysValues)
+
+showClasses :: ParseState -> String
+showClasses st = 
+  let classesToMethods = views _classInterfaces M.toList st 
+      classesToFields  = views _classFields M.toList st
+      in
+   render . vcat $ map (\((clazz, methods),(_,fields)) -> P.showClass clazz "unknown" fields methods) $ filter (\((class1, _), (class2, _)) -> class1 == class2) $ liftM2 (,) classesToMethods classesToFields

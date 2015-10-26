@@ -48,20 +48,32 @@ iopP x = when logParser $ iop $ x
 logChecker = True
 iopC x = when logChecker $ iop $ x
 
-logWildcardRules = True
+logHasEffects = False
+iopE x = when logHasEffects $ iop $ x
+
+logEvaluator = False
+iopEV x = when logEvaluator $ iop $ x
+
+logStackCalculus = False
+iopSC x = when logStackCalculus $ iop $ x
+
+logSubtype = False
+iopSu x = when logSubtype $ iop $ x
+
+logWildcardRules = False
 iopW x = when logWildcardRules $ iop $ x
 
 chosen' = fmap (^?! _Left) . runExceptT
 for = flip map
 
-blockedWith caption x = do
-  iop $ "-----" ++ caption
-  blocked x
+blockedWith caption f x = do
+  f $ "-----" ++ caption
+  blocked f x
 
-blocked x = do
-  iop "-----------------------"
+blocked f x = do
+  f "-----------------------"
   x
-  iop "-----------------------"
+  f "-----------------------"
 
 
 emptySt :: StackEffect
