@@ -45,7 +45,7 @@ l4 = lift . l3
 logParser = False
 iopP x = when logParser $ iop $ x
 
-logChecker = True
+logChecker = False
 iopC x = when logChecker $ iop $ x
 
 logHasEffects = False

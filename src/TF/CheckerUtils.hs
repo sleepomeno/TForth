@@ -198,5 +198,5 @@ flag'' = do
   id <- _identifier <<+= 1
   return $ IndexedStackType (NoReference $ PrimType FT.flag) (Just id)
 
-showEffects = unlines . map (render . P.stackEffectNice . fst)
+showEffects = unlines . map (render . P.stackEffect . fst)
 

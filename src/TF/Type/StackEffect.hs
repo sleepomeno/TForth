@@ -88,7 +88,7 @@ data DefiningArg = DefiningArg {
                       definingArgInfo :: ArgInfo StackEffect
                     , argType :: Maybe IndexedStackType
                     -- , runtimeEffect :: Maybe [(StackEffect,StackEffect)]
-                    , runtimeEffect :: Maybe ForthEffect
+                    , runtimeEffect :: Maybe ForthEffect -- TODO -- -- replace wiht maybe runtimespecification
                     }  deriving (Show,Eq,Ord)
 
 data StreamArg = StreamArg {
