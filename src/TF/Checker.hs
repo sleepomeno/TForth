@@ -8,7 +8,7 @@ import Prelude hiding (last)
 import           Control.Arrow
 import           Control.Error            as E
 -- import           Control.Lens             hiding (noneOf, (??), _Empty)
-import Control.Lens (filtered,has,(^?!),only,(<<+=),imap,_Wrapped)
+import Control.Lens (filtered,has,(^?!),only,(<<+=),imap,_Wrapped,_Unwrapped)
 import Lens.Simple
 import           Control.Monad.Error.Lens
 import           Control.Monad.Extra
@@ -130,10 +130,10 @@ collectEffects a = do
   
 
 checkEffects :: ForthEffect -> ReaderT CheckEffectsConfig CheckerM ()
-checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
+checkEffects forthEffectN@(ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
 
   s <- lift getState
-  let (ForthEffect (realEffs, Intersections oldCompileI oldExecI)) = s ^. _effects
+  let forthEffectO@(ForthEffect (realEffs, Intersections oldCompileI oldExecI)) = s ^. _effects
 
   let effs' = zipzap $ liftM2 (,) realEffs stE2s
 
@@ -174,25 +174,41 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
   let (nrOfOldCompEffs, nrOfOldExecEffs) = unzip realEffs & both %~ length . nub
       (nrOfNewCompEffs, nrOfNewExecEffs) = unzip stE2s    & both %~ length . nub
 
-  -- let compileEffectError = compileEffectClash && not (oldCompileI || newCompileI)
-  --     execEffectError = execEffectClash && not (oldExecI || newExecI)
-  let compileEffectError = compileEffectClash && (((nrOfOldCompEffs > 1 && not oldCompileI) ||
-                                                  (nrOfNewCompEffs > 1 && not newCompileI)) || not (oldCompileI || newCompileI))
-      execEffectError = execEffectClash && (((nrOfOldExecEffs > 1 && not oldExecI) ||
-                                                  (nrOfNewExecEffs > 1 && not newExecI)) || not (oldExecI || newExecI))
+  validEffects <- fmap (toListOf (traverse._Right) . filter isRight) . mapM runExceptT $ resultingEffects'
+  let typeChecks = (not . null $ validEffects)
+
+  let compileEffectError = compileEffectClash && ((((nrOfOldCompEffs > 1 && not oldCompileI) ||
+                                                  (nrOfNewCompEffs > 1 && not newCompileI)) || not typeChecks) || not (oldCompileI || newCompileI))
+      execEffectError = execEffectClash && ((((nrOfOldExecEffs > 1 && not oldExecI) ||
+                                                  (nrOfNewExecEffs > 1 && not newExecI)) || not typeChecks) || not (oldExecI || newExecI))
+
 
   let errorInfo = do
         fwordOrExpr <- asks (view forthWordOrExpr)
         tellErrors' <- asks (view tellErrors)
-        lift . lift . lift $ when tellErrors' $
+        when tellErrors' $
            if (has (_Just._Expr._Assert) fwordOrExpr) then
-              tell $ Info [] [AssertFailure realEffs stE2s]
-           else
-              tell $ Info [CheckFailure realEffs stE2s] []
+              lift . lift . lift  $ tell $ Info [] [AssertFailure realEffs stE2s]
+           else do
 
-        return $ case fwordOrExpr of
-          Just x  -> render $ either P.infoForthWord P.infoExpr $ view nodeIso $ x
-          Nothing -> ""
+              -- iopC $ "compileEffectError: " <> show compileEffectError
+              -- iopC $ "nrOfOldCompEffs: " <> show nrOfOldCompEffs
+              -- iopC $ "nrOfNewCompEffs: " <> show nrOfNewCompEffs
+              -- iopC $ "execEffectERror: " <> show execEffectError
+              -- iopC $ "execEffectClash: " <> show execEffectClash
+              -- iopC $ "compEffectClash: " <> show compileEffectClash
+              -- iopC $ "oldCompileI: " <> show oldCompileI
+              -- iopC $ "newCompileI: " <> show newCompileI
+              -- iopC $ "oldExecI: " <> show oldExecI
+              -- iopC $ "newExecI: " <> show newExecI
+              let failure = if | compileEffectError && execEffectError -> CompExecTypeError fwordOrExpr forthEffectO forthEffectN
+                               | compileEffectError                    -> CompTypeError fwordOrExpr (StackEffectsWI (MultiStackEffect $ map fst realEffs) (Intersection oldCompileI)) (StackEffectsWI (MultiStackEffect $ map fst stE2s) (Intersection newCompileI))
+                               | execEffectError                       -> ExecTypeError fwordOrExpr (StackEffectsWI (MultiStackEffect $ map snd realEffs) (Intersection oldExecI)) (StackEffectsWI (MultiStackEffect $ map snd stE2s) (Intersection newExecI))
+              
+              lift . lift . lift $ tell $ Info [failure] []
+
+        return $ maybe mempty (\x  -> "Type error caused by " ++ (render $ either P.infoForthWord P.infoExpr $ view nodeIso $ x))
+                              fwordOrExpr
 
 
 
@@ -209,9 +225,7 @@ checkEffects (ForthEffect (stE2s, Intersections newCompileI newExecI)) = do
     -- throwing (_TypeClashM._MultiEffs) message
     throwing _Clash message
 
-  validEffects <- fmap (toListOf (traverse._Right) . filter isRight) . mapM runExceptT $ resultingEffects'
 
-  let typeChecks = (not . null $ validEffects)
 
 
   unless typeChecks $ do

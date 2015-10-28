@@ -16,7 +16,7 @@ import           TF.Util
 import           TF.SubtypeUtil
 -- import qualified TF.DataTypes as DT
 -- import           Data.Data
-import           TF.Types                 hiding (isSubtypeOf, word)
+import           TF.Types                 hiding (word)
 import TF.Errors
 
 import TF.CheckerUtils
@@ -61,10 +61,8 @@ getStackEffects' (IfElseExpr thens elses) = do
 
 getStackEffects' (IfExpr forthWordsOrExprs) = do
     res <- withEmpty''' $ do
-      -- lift $ depth += 1
       checkNodes <- view _1
       (ForthEffect compExecEffs@(effs, _)) <- lift $ checkNodes forthWordsOrExprs
-      -- lift $ depth -= 1
 
       forbidMultiEffs <- lift $ views allowMultipleEffects not
 

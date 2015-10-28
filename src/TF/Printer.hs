@@ -170,10 +170,24 @@ assertFailure :: AssertFailure -> Doc
 assertFailure (AssertFailure olds news) = text "OLD EFFS" $+$ (nested . vcat $ map compExecEff olds) $+$
                                         text "NEW EFFS" $+$ (nested . vcat $ map compExecEff news)
 
-checkFailure :: CheckFailure -> Doc
-checkFailure (CheckFailure olds news) = text "OLD EFFS" $+$ (nested . vcat $ map compExecEff olds) $+$
-                                        text "NEW EFFS" $+$ (nested . vcat $ map compExecEff news)
+-- checkFailure :: CheckFailure -> Doc
+-- checkFailure (CheckFailure olds news) = text "OLD EFFS" $+$ (nested . vcat $ map compExecEff olds) $+$
+--                                         text "NEW EFFS" $+$ (nested . vcat $ map compExecEff news)
+showMaybeNode Nothing = mempty
+showMaybeNode (Just node) = either infoForthWord infoExpr $ view nodeIso $ node
+-- checkFailure :: CheckFailure -> Doc
+checkFailure (ExecTypeError mNode (StackEffectsWI effsO (Intersection iO))  (StackEffectsWI effsN (Intersection iN))) = showMaybeNode mNode $+$ nest 1 (execCheckFailure (effsO ^. _Wrapped,iO) (effsN ^. _Wrapped,iN))
+checkFailure (CompTypeError mNode (StackEffectsWI effsO (Intersection iO))  (StackEffectsWI effsN (Intersection iN))) = showMaybeNode mNode $+$ nest 1 (compCheckFailure (effsO ^. _Wrapped,iO) (effsN ^. _Wrapped,iN))
+checkFailure (CompExecTypeError mNode (ForthEffect (pairsO,(Intersections iCO iEO)))  (ForthEffect (pairsN,(Intersections iCN iEN )))) =
+  let (effsCO,effsEO) = unzip pairsO
+      (effsCN,effsEN) = unzip pairsN
+    in showMaybeNode mNode $+$ nest 1 (execCheckFailure (effsEO,iEO) (effsEN,iEN) $+$ compCheckFailure (effsCO,iCO) (effsCN,iCN))
+compCheckFailure  (effsO,iO) (effsN,iN) = text "COMPILE-TIME-ERROR" $+$ nested (doesNotCompose (effsO,iO) (effsN,iN))
+execCheckFailure  (effsO,iO) (effsN,iN) = text "EXEC-TIME-ERROR" $+$ nested (doesNotCompose (effsO,iO) (effsN,iN))
 
+doesNotCompose (effsO,iO) (effsN,iN) = multiStackEffect' iO effsO $+$ text "DOES NOT COMPOSE WITH" $+$ multiStackEffect' iN effsN
+
+  
 compExecEff :: CompExecEffect -> Doc
 compExecEff (cEff, eEff) = text "COMP EFFECT" $+$ nested (stackEffect cEff) $+$
                             text "EXEC EFFECT" $+$ nested (stackEffect eEff)
@@ -290,6 +304,7 @@ showRuntimeType runtime = case runtime of
      
 
 
+multiStackEffect' intersect effs = multiStackEffect intersect (MultiStackEffect effs)
 multiStackEffect intersect (MultiStackEffect effs) = hcat . punctuate delimiter $ map stackEffect effs
    where
      delimiter = text $ if intersect then " & " else " / "
@@ -313,7 +328,7 @@ showParseTree ast = inBlockWithCaption  "ORDER OF PARSERS" (text ast)
 
 showInfo (Info failures asserts) = 
        let failure = if not $ null failures then
-                       inBlockWithCaption "General Type Errors" (vcat . map checkFailure $ failures)
+                       inBlockWithCaption "Type Errors" (vcat . map checkFailure $ failures)
                      else mempty
            assert = if not $ null asserts then
                       inBlockWithCaption "ASSERT Type errors" (vcat . map assertFailure $ asserts)

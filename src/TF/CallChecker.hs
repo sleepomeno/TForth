@@ -87,11 +87,12 @@ runChecker' conf s = do
 defParseState :: ParseState
 defParseState = ParseState M.empty M.empty INTERPRETSTATE False emptyForthEffect (M.fromList [("object", [])]) (M.fromList [("object", [])]) S.empty M.empty [] (Trace (fromTree $ Node "" []))
 
+
 runChecker :: ParseConfig -> String -> IO ()
 runChecker config s = do
     let ((res,treeZipper), info) = runChecker' config s
     showInfo info
-    putStrLn . render . P.showParseTree . drawTree . toTree $ treeZipper
+    println . P.showParseTree . drawTree . toTree $ treeZipper
     case res of
       Left err -> putStrLn $ "Error: " ++ show err
       Right result -> do
@@ -99,8 +100,11 @@ runChecker config s = do
    where
      showResult :: ([Node], ParseState) -> IO ()
      showResult (_, parseState) = do
-       let checkerState = render $ P.showCheckerState parseState
-       putStrLn . render . P.showAST . drawTree . toTree . view (_trace._Wrapped) $ parseState
-       putStrLn checkerState
+       println . P.showAST . drawTree . toTree . view (_trace._Wrapped) $ parseState
+       println $ P.showDefinitions parseState
+       when (config ^. allowOOP) $ println $ P.showClasses parseState
+       println $ P.showTopLevel parseState
      showInfo :: Info -> IO ()
-     showInfo info = putStrLn . render $ P.showInfo info
+     showInfo info = println $ P.showInfo info
+
+println = putStrLn . render

@@ -206,11 +206,15 @@ data ParseStackEffectsConfig = ParseStackEffectsConfig {
  , _stackeffAllowDynamicInStackComments :: Bool
 } deriving (Show,Eq)
 
+data CheckFailure = ExecTypeError (Maybe Node) StackEffectsWI StackEffectsWI
+                  | CompTypeError  (Maybe Node) StackEffectsWI StackEffectsWI
+                  | CompExecTypeError (Maybe Node) ForthEffect ForthEffect deriving (Show,Eq)
+
   
-data CheckFailure = CheckFailure {
-  currentEffectsCheckFail :: [CompExecEffect],
-  newEffectsCheckFail :: [CompExecEffect]
-} deriving (Show,Eq)
+-- data CheckFailure = CheckFailure {
+--   currentEffectsCheckFail :: [CompExecEffect],
+--   newEffectsCheckFail :: [CompExecEffect]
+-- } deriving (Show,Eq)
 
 data AssertFailure = AssertFailure {
   currentEffectsAssert :: [CompExecEffect],

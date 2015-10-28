@@ -56,7 +56,7 @@ data ForthWord = UnknownE Unknown
                | KnownWord ParsedWord
                deriving (Eq, Show)
 
-data Node = ForthWord ForthWord | Expr Expr deriving Show
+data Node = ForthWord ForthWord | Expr Expr deriving (Show,Eq)
 
 data ControlStructure = IfExpr [Node]
                       | IfElseExpr [Node] [Node]
@@ -64,7 +64,7 @@ data ControlStructure = IfExpr [Node]
                       | DoPlusLoop [Node]
                       | BeginUntil [Node]
                       | BeginWhileRepeat [Node] [Node]
-          deriving (Show)
+          deriving (Show,Eq)
 
 
 type NameOfWord = String
@@ -85,7 +85,7 @@ data Expr =  ColonExpr String (Maybe (Semantics, Bool)) [Node]
           | Require String
           | ControlExpr ControlStructure
           | OOPExpr OOPExpr
-          deriving (Show)
+          deriving (Show,Eq)
 
 type Variable = String
 type Method = String
@@ -106,7 +106,7 @@ data OOPExpr = Class ClassName [(Variable, OOFieldSem)] [(Method, OOMethodSem)] 
           | FieldCall (CompiledOrExecuted Variable)
           | NoName (Maybe ([StackEffect], Bool)) [Node] ClassName Method
           | NoNameClash (Maybe ([StackEffect], Bool)) ClassName Method
-          deriving (Show)
+          deriving (Show,Eq)
                                                      
 
 
