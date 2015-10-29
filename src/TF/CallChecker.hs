@@ -40,7 +40,7 @@ checkFile :: ParseConfig -> FilePath -> IO ()
 checkFile conf file = (`runContT` return) $ callCC $ \ret -> do
     fileExists <- liftIO $ doesFileExist file
     unless fileExists $ do
-      liftIO $ putStrLn $ file <> " does not exist!"
+      liftIO $ putStrLn $ "The file '" <> file <> "' does not exist!"
       ret ()
     handle <- liftIO $ openFile file ReadMode
     contents <- liftIO $ hGetContents handle
